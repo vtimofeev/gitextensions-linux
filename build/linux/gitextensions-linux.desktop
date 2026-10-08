@@ -1,0 +1,11 @@
+[Desktop Entry]
+Type=Application
+Name=Git Extensions Linux
+Comment=Browse repositories and manage Git changes
+Comment[ru]=Просмотр репозиториев и управление изменениями Git
+Exec=/bin/sh -c "exec \\"\\$HOME/.local/bin/gitextensions-linux\\" \\"\\$@\\"" gitextensions-linux %f
+Icon=gitextensions-linux
+Terminal=false
+Categories=Development;RevisionControl;
+StartupWMClass=gitextensions-linux
+MimeType=inode/directory;

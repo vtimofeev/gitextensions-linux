@@ -1,0 +1,66 @@
+:root {
+  --color-level-100: #f3f7fc;
+  --color-level-200: #ffffff;
+  --color-level-300: #fbfdff;
+  --color-surface-subtle: #eaf2fb;
+  --color-accent: #1d6ff2;
+  --color-accent-2: #0ea5e9;
+  --color-accent-3: #0d9488;
+  --color-border: #d8e3ef;
+  --color-border-subtle: #e9f0f7;
+  --color-input: #ffffff;
+  --color-input-border: #bccbdc;
+  --color-selection: #dcebff;
+  --color-positive: #16a34a;
+  --color-warning: #d97706;
+  --color-negative: #dc2626;
+  --color-text: #132033;
+  --color-text-secondary: #52647a;
+  --ref-local: #1d6ff2;
+  --ref-remote: #16a34a;
+  --ref-tag: #0284c7;
+  --ref-other: #64748b;
+  --ref-current-background: #dcebff;
+  --graph-head: #0d9488;
+  --diff-added-background: #e3f6ea;
+  --diff-removed-background: #fde8e8;
+  --graph-lane-1: #1d6ff2;
+  --graph-lane-2: #0ea5e9;
+  --graph-lane-3: #0d9488;
+  --graph-lane-4: #16a34a;
+  --graph-lane-5: #6366f1;
+  --graph-lane-6: #06b6d4;
+  --graph-lane-7: #f59e0b;
+  --graph-lane-8: #ec4899;
+  --color-still: #64748b;
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 24px;
+  --space-6: 32px;
+  --space-7: 48px;
+  --space-8: 64px;
+
+  --radius-sm: 4px;
+  --radius-md: 5px;
+  --radius-lg: 6px;
+
+  --font-sans: "Ubuntu", system-ui, "Segoe UI", "Droid Sans", sans-serif;
+  --font-code: "JetBrains Mono NL", Menlo, Monaco, "Courier New", monospace;
+  --font-size-base: 13px;
+  --font-size-code: var(--font-size-base);
+  --history-row-height: calc(var(--font-size-base) * 32 / 13);
+
+  --text-xs: calc(var(--font-size-base) * 0.85);
+  --text-sm: calc(var(--font-size-base) * 1);
+  --text-md: calc(var(--font-size-base) * 1.08);
+  --text-lg: calc(var(--font-size-base) * 1.23);
+  --text-xl: calc(var(--font-size-base) * 1.54);
+
+  --shadow-sm: none;
+  --shadow-md: none;
+
+  --z-header: 100;
+  --z-modal: 1000;
+}

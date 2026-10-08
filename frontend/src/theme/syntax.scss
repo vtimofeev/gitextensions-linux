@@ -1,0 +1,40 @@
+.syntax-keyword {
+  color: var(--syntax-keyword);
+}
+.syntax-string {
+  color: var(--syntax-string);
+}
+.syntax-number {
+  color: var(--syntax-number);
+}
+.syntax-comment {
+  color: var(--syntax-comment);
+  font-style: italic;
+}
+.syntax-function {
+  color: var(--syntax-function);
+}
+.syntax-type {
+  color: var(--syntax-type);
+}
+.syntax-variable {
+  color: var(--syntax-variable);
+}
+.syntax-property {
+  color: var(--syntax-property);
+}
+.syntax-tag {
+  color: var(--syntax-tag);
+}
+.syntax-attribute {
+  color: var(--syntax-attribute);
+}
+.syntax-meta {
+  color: var(--syntax-meta);
+}
+.syntax-operator {
+  color: var(--syntax-operator);
+}
+.syntax-punctuation {
+  color: var(--syntax-punctuation);
+}

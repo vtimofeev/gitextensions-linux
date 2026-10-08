@@ -1,0 +1,265 @@
+* {
+  box-sizing: border-box;
+}
+body {
+  margin: 0;
+  font: var(--text-sm)/1.5 var(--font-sans);
+  color: var(--color-text);
+  background: var(--color-level-100);
+}
+button,
+input,
+textarea,
+select {
+  font: inherit;
+}
+h1,
+h2,
+h3,
+p {
+  margin: 0;
+}
+h1 {
+  font-size: calc(var(--font-size-base) * 22 / 13);
+}
+h2 {
+  font-size: calc(var(--font-size-base) * 16 / 13);
+}
+h3 {
+  font-size: calc(var(--font-size-base) * 14 / 13);
+}
+button {
+  cursor: pointer;
+}
+button:disabled {
+  cursor: default;
+}
+input,
+textarea,
+select {
+  color: var(--color-text);
+  background: var(--color-input);
+  border: 1px solid var(--color-input-border);
+  border-radius: var(--radius-md);
+  padding: 4px 7px;
+  width: 100%;
+}
+label {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+label.check {
+  flex-direction: row;
+  align-items: center;
+  input {
+    width: auto;
+  }
+}
+:focus-visible {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 2px;
+}
+.panel {
+  background: var(--color-level-200);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-sm);
+  overflow: hidden;
+  min-width: 0;
+}
+.panel-heading {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 8px;
+  border-bottom: 1px solid var(--color-border);
+}
+.muted {
+  color: var(--color-text-secondary);
+}
+.empty {
+  padding: 12px;
+  color: var(--color-text-secondary);
+}
+.actions {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+.stack {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.dialog-form {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 360px;
+  padding-top: 8px;
+}
+.file-row {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+  padding: 2px 8px;
+  border-bottom: 1px solid var(--color-border-subtle);
+}
+.file-button {
+  flex: 1;
+  min-width: 0;
+  text-align: left;
+  border: 0;
+  background: transparent;
+  color: var(--color-text);
+  padding: 3px 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.file-button:hover {
+  color: var(--color-accent);
+}
+.file-status {
+  font: var(--font-size-code) var(--font-code);
+  color: var(--color-positive);
+}
+.selected {
+  background: var(--color-selection);
+  box-shadow: inset 3px 0 var(--color-accent);
+}
+pre {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  font: var(--font-size-code)/1.4 var(--font-code);
+}
+
+.p-button {
+  border-radius: var(--radius-sm);
+  padding: 4px 8px;
+  gap: 4px;
+  font-size: calc(var(--font-size-base) * 13 / 13);
+}
+.p-button.p-button-icon-only {
+  width: calc(var(--font-size-base) * 28 / 13);
+  height: calc(var(--font-size-base) * 28 / 13);
+  padding: 3px;
+}
+.p-dialog,
+.p-dialog-header,
+.p-dialog-content,
+.p-dialog-footer {
+  border-radius: var(--radius-sm);
+  box-shadow: none;
+}
+.p-dialog-header {
+  padding: 10px 12px;
+}
+.p-dialog-content {
+  padding: 0 12px 12px;
+}
+.p-dialog-title {
+  font-size: calc(var(--font-size-base) * 16 / 13);
+}
+.p-dialog-close-button {
+  width: calc(var(--font-size-base) * 26 / 13);
+  height: calc(var(--font-size-base) * 26 / 13);
+}
+
+.p-button.p-component {
+  border-radius: var(--radius-sm);
+  padding: 4px 8px;
+  font-size: calc(var(--font-size-base) * 13 / 13);
+}
+.p-button.p-button-rounded {
+  border-radius: var(--radius-sm);
+}
+.p-dialog.p-component {
+  box-shadow: none;
+}
+.p-dialog .p-dialog-header {
+  padding: 8px 10px;
+}
+.p-dialog .p-dialog-content {
+  padding: 0 10px 10px;
+}
+.p-dialog .p-dialog-title {
+  font-size: calc(var(--font-size-base) * 16 / 13);
+}
+/* Dialog close is a plain cross: no round border, background or focus ring
+   (dialogs autofocus it, which drew a ring on every open). */
+.p-dialog .p-dialog-close-button,
+.p-dialog .p-dialog-header-actions .p-button {
+  width: calc(var(--font-size-base) * 26 / 13);
+  height: calc(var(--font-size-base) * 26 / 13);
+  padding: 0;
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  box-shadow: none;
+  outline: none;
+  color: var(--color-text-secondary);
+  &:not(:disabled):hover,
+  &:not(:disabled):active {
+    background: transparent;
+    border: 0;
+    color: var(--color-text);
+  }
+  &:focus,
+  &:focus-visible {
+    outline: none;
+    box-shadow: none;
+  }
+  &:focus-visible {
+    color: var(--color-text);
+    background: var(--color-surface-subtle);
+  }
+  .p-icon,
+  .pi {
+    width: calc(var(--font-size-base) * 12 / 13);
+    height: calc(var(--font-size-base) * 12 / 13);
+    font-size: calc(var(--font-size-base) * 12 / 13);
+  }
+}
+
+.sidebar .panel {
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+}
+.panel-heading h2,
+.panel-heading h3 {
+  font-size: var(--text-xs);
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--color-text-secondary);
+}
+.p-button.p-button-icon-only {
+  width: calc(var(--font-size-base) * 28 / 13);
+  height: calc(var(--font-size-base) * 28 / 13);
+}
+
+.file-row {
+  min-height: calc(var(--font-size-base) * 29 / 13);
+}
+.file-button {
+  font-family: var(--font-code);
+  font-size: var(--font-size-code);
+}
+code {
+  font-family: var(--font-code);
+  font-size: var(--font-size-code);
+}
+html {
+  font-size: var(--font-size-base);
+}
+
+.theme-switching *,
+.theme-switching *::before,
+.theme-switching *::after {
+  transition: none !important;
+}
