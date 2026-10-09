@@ -112,8 +112,61 @@ def main():
     temporary = output.with_suffix(".tmp")
     try:
         with tarfile.open(temporary, "w:gz") as archive:
-            for name in ("build/bin/gitextensions-linux", "build/appicon.png", "build/linux", "frontend/public/appicon.svg", "docs/linux-install.md", "docs/linux-install.ru.md", "README.md", "README.ru.md", "NOTICE.md", "NOTICE.ru.md", "LICENSE.md"):
-                archive.add(ROOT / name, arcname=name)
+            release_files = {
+                "build/bin/gitextensions-linux": "gitextensions-linux",
+                "build/linux/install.sh": "install.sh",
+                "build/linux/gitextensions-linux.desktop": "assets/gitextensions-linux.desktop",
+                "build/appicon.png": "assets/appicon.png",
+                "frontend/public/appicon.svg": "assets/appicon.svg",
+            }
+            for name in ("docs/linux-install.md", "docs/linux-install.ru.md", "docs/user-guide.md", "docs/user-guide.ru.md", "docs/commit-graph.md", "docs/commit-graph.ru.md", "NOTICE.md", "NOTICE.ru.md", "LICENSE.md"):
+                release_files[name] = name
+            for name, destination in release_files.items():
+                archive.add(ROOT / name, arcname=destination)
+            add_text(archive, "README.md", """# Git Extensions Linux
+
+English | [Русский](README.ru.md)
+
+From this extracted folder, install without sudo:
+
+```sh
+./install.sh
+```
+
+Then launch **Git Extensions Linux** from the application menu.
+The executable is installed to `~/.local/bin/gitextensions-linux`.
+You can also run `./gitextensions-linux` directly from this folder.
+Go and Node.js are not needed.
+
+Install the required system libraries for your release: [Linux installation guide](docs/linux-install.md).
+For everyday use, see the [user guide](docs/user-guide.md).
+
+`assets/` contains installer icons and the menu launcher. `source/` contains the matching project sources for rebuilding.
+Keep the sources and license notices with the release when sharing it.
+See [credits](NOTICE.md), [license](LICENSE.md) and `licenses/` for dependency notices.
+""")
+            add_text(archive, "README.ru.md", """# Git Extensions Linux
+
+[English](README.md) | Русский
+
+Из распакованной папки установите приложение без sudo:
+
+```sh
+./install.sh
+```
+
+Затем запустите **Git Extensions Linux** из меню приложений.
+Бинарник устанавливается в `~/.local/bin/gitextensions-linux`.
+Можно также запустить `./gitextensions-linux` прямо из этой папки.
+Go и Node.js не нужны.
+
+Установите системные библиотеки для вашей сборки: [инструкция для Linux](docs/linux-install.ru.md).
+Работа с приложением описана в [руководстве пользователя](docs/user-guide.ru.md).
+
+В `assets/` находятся иконки и ярлык меню для установщика. В `source/` — соответствующие сборке исходники для пересборки.
+При передаче релиза сохраняйте исходники и лицензионные уведомления.
+См. [атрибуцию](NOTICE.ru.md), [лицензию](LICENSE.md) и уведомления зависимостей в `licenses/`.
+""")
             for name in sources:
                 archive.add(ROOT / name, arcname=f"source/{name}")
             for name, path in sorted(license_files.items()):

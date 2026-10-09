@@ -25,7 +25,7 @@ Extract into a separate folder, then install without `sudo`:
 mkdir -p gitextensions-linux-release
 tar -xzf gitextensions-linux-amd64.tar.gz -C gitextensions-linux-release
 cd gitextensions-linux-release
-./build/linux/install.sh
+./install.sh
 ```
 
 The binary goes to `~/.local/bin`; the launcher and icons go under `${XDG_DATA_HOME:-~/.local/share}`. A desktop shortcut is also installed if enabled in XDG settings.
@@ -76,7 +76,7 @@ After building, from the Git repository root:
 python3 build/linux/package.py
 ```
 
-`build/bin/gitextensions-linux-amd64.tar.gz` includes the installer, icons, EN/RU guides, `LICENSE.md`, credits, dependency licenses and the matching source snapshot in `source/`.
+`build/bin/gitextensions-linux-amd64.tar.gz` contains `gitextensions-linux` and `install.sh` at the top level, a short EN/RU README, icons in `assets/`, installation and user guides in `docs/`, `LICENSE.md`, credits, dependency licenses and the matching source snapshot in `source/`.
 To rebuild, open `source/` and follow the build steps above. Share the sources with the binary: see [GPL and adapted code](../NOTICE.md).
 Packaging needs Python 3, Git, Go and installed npm dependencies.
 

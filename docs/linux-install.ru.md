@@ -25,7 +25,7 @@
 mkdir -p gitextensions-linux-release
 tar -xzf gitextensions-linux-amd64.tar.gz -C gitextensions-linux-release
 cd gitextensions-linux-release
-./build/linux/install.sh
+./install.sh
 ```
 
 Бинарник попадёт в `~/.local/bin`, launcher и иконки — в `${XDG_DATA_HOME:-~/.local/share}`. Ярлык рабочего стола устанавливается, если этот каталог включён в настройках XDG.
@@ -76,7 +76,7 @@ wails build -tags webkit2_41
 python3 build/linux/package.py
 ```
 
-`build/bin/gitextensions-linux-amd64.tar.gz` включает установщик, иконки, EN/RU инструкции, `LICENSE.md`, атрибуцию, лицензии зависимостей и соответствующие сборке исходники в `source/`.
+`build/bin/gitextensions-linux-amd64.tar.gz` содержит `gitextensions-linux` и `install.sh` в корне, краткий README на EN/RU, иконки в `assets/`, инструкции по установке и использованию в `docs/`, `LICENSE.md`, атрибуцию, лицензии зависимостей и соответствующие сборке исходники в `source/`.
 Для пересборки откройте `source/` и выполните команды выше. Передавайте исходники вместе с бинарником: [GPL и адаптированный код](../NOTICE.ru.md).
 Упаковке нужны Python 3, Git, Go и установленные npm-зависимости.
 

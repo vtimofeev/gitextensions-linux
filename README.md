@@ -30,7 +30,7 @@ The Linux app with a real demo repository: history, branches, local changes and 
 Extract a release archive into its own folder and install it without `sudo`:
 
 ```sh
-./build/linux/install.sh
+./install.sh
 ~/.local/bin/gitextensions-linux --repo "/path/to/repository"
 ```
 

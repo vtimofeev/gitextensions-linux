@@ -30,7 +30,7 @@
 Готовую сборку распакуйте в отдельный каталог и установите без `sudo`:
 
 ```sh
-./build/linux/install.sh
+./install.sh
 ~/.local/bin/gitextensions-linux --repo "/path/to/repository"
 ```
 

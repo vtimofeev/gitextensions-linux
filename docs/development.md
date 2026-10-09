@@ -56,7 +56,7 @@ wails build
 python3 build/linux/package.py
 ```
 
-The archive includes the binary, installer, icons, documentation, sources and license notices.
+The archive puts `gitextensions-linux`, `install.sh` and a short EN/RU README at the top level. Icons and the menu launcher are in `assets/`; installation and user guides are in `docs/`. Sources and license notices remain in `source/` and `licenses/`.
 Sources come from the current working tree, including new project files. The source snapshot excludes `.git`, dependencies, caches and test output.
 Before a public release, check the archive contents and publish the exact sources with the build.
 English guides use `.md`; Russian versions sit next to them as `.ru.md`. Keep both versions up to date.

@@ -3,13 +3,22 @@ set -euo pipefail
 
 app_id=gitextensions-linux
 script_dir=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)
-binary=${1:-"$script_dir/../bin/$app_id"}
+if [[ -f "$script_dir/$app_id" ]]; then
+  default_binary="$script_dir/$app_id"
+  png_icon="$script_dir/assets/appicon.png"
+  svg_icon="$script_dir/assets/appicon.svg"
+  desktop_file="$script_dir/assets/$app_id.desktop"
+else
+  default_binary="$script_dir/../bin/$app_id"
+  png_icon="$script_dir/../appicon.png"
+  svg_icon="$script_dir/../../frontend/public/appicon.svg"
+  desktop_file="$script_dir/$app_id.desktop"
+fi
+binary=${1:-"$default_binary"}
 bin_dir="$HOME/.local/bin"
 data_dir=${XDG_DATA_HOME:-"$HOME/.local/share"}
 icons_dir="$data_dir/icons/hicolor"
 launcher="$data_dir/applications/$app_id.desktop"
-png_icon="$script_dir/../appicon.png"
-svg_icon="$script_dir/../../frontend/public/appicon.svg"
 
 validate_paths() {
   if [[ ! -f "$binary" || ! -x "$binary" ]]; then
@@ -31,7 +40,7 @@ install_files() {
   install -D -m 644 -- "$png_icon" "$icons_dir/256x256/apps/$app_id.png"
   install -D -m 644 -- "$svg_icon" "$icons_dir/scalable/apps/$app_id.svg"
   # The launcher expands HOME at startup; no generated Exec line is needed.
-  install -D -m 644 -- "$script_dir/$app_id.desktop" "$launcher"
+  install -D -m 644 -- "$desktop_file" "$launcher"
 }
 
 install_desktop_shortcut() {
