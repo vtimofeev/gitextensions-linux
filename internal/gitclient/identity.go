@@ -1,8 +1,8 @@
 package gitclient
 
 import (
+	"context"
 	"errors"
-	"os"
 	"os/exec"
 	"strings"
 )
@@ -21,9 +21,9 @@ func (s *Service) Identity(path string) (Identity, error) {
 			args = []string{"config", "--local", "--get", key}
 		}
 		// Run directly (not via s.run) to tell "unset" (exit 1) from real failures.
-		cmd := exec.Command("git", args...)
-		cmd.Dir = root
-		cmd.Env = append(os.Environ(), "GIT_TERMINAL_PROMPT=0", "LC_ALL=C")
+		ctx, cancel := context.WithTimeout(context.Background(), gitTimeout("config"))
+		defer cancel()
+		cmd := gitCommand(ctx, root, args...)
 		out, err := cmd.Output()
 		if err != nil {
 			var exit *exec.ExitError
@@ -70,17 +70,13 @@ func (s *Service) Identity(path string) (Identity, error) {
 	return result, nil
 }
 func (s *Service) SetIdentity(path, name, email string) (string, error) {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	if strings.TrimSpace(name) == "" || strings.TrimSpace(email) == "" || strings.ContainsAny(name+email, "\r\n") || !strings.Contains(email, "@") {
-		return "", errors.New("identity requires a name and an email containing @, without newlines")
-	}
-	root, err := s.root(path)
-	if err != nil {
-		return "", err
-	}
-	if _, err = s.run(root, "", "config", "--local", "user.name", name); err != nil {
-		return "", err
-	}
-	return s.run(root, "", "config", "--local", "user.email", email)
+	return s.mutation(path, func(root string) (string, error) {
+		if strings.TrimSpace(name) == "" || strings.TrimSpace(email) == "" || strings.ContainsAny(name+email, "\r\n") || !strings.Contains(email, "@") {
+			return "", errors.New("identity requires a name and an email containing @, without newlines")
+		}
+		if _, err := s.run(root, "", "config", "--local", "user.name", name); err != nil {
+			return "", err
+		}
+		return s.run(root, "", "config", "--local", "user.email", email)
+	})
 }

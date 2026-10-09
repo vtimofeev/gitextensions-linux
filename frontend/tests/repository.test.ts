@@ -480,3 +480,62 @@ describe("large working trees", () => {
     expect(repo.isFileSelected("file-29999", "unstaged")).toBe(false);
   });
 });
+
+describe("external tool sessions", () => {
+  it("keeps repository reads available and refreshes after closing", async () => {
+    const { api, repo } = fixture();
+    await repo.open("/repo");
+    let close!: (output: string) => void;
+    const running = repo.executeExternalTool(
+      () =>
+        new Promise<string>((resolve) => {
+          close = resolve;
+        }),
+    );
+    expect(repo.busy).toBe(false);
+    expect(repo.externalToolRunning).toBe(true);
+    expect(
+      await repo.executeExternalTool(() => Promise.resolve("duplicate")),
+    ).toBe(false);
+    await repo.refresh();
+    expect(api.snapshot).toHaveBeenCalledTimes(2);
+    close("closed");
+    expect(await running).toBe(true);
+    expect(repo.externalToolRunning).toBe(false);
+    expect(repo.output).toBe("closed");
+    expect(api.snapshot).toHaveBeenCalledTimes(3);
+  });
+  it("ignores a tool's late failure after switching repositories", async () => {
+    const { api, repo } = fixture();
+    await repo.open("/repo");
+    let fail!: (error: Error) => void;
+    const running = repo.executeExternalTool(
+      () =>
+        new Promise<string>((_, reject) => {
+          fail = reject;
+        }),
+    );
+    api.snapshot = vi
+      .fn()
+      .mockResolvedValue({ ...structuredClone(snapshot), path: "/other" });
+    await repo.open("/other");
+    fail(new Error("old repository tool failed"));
+    expect(await running).toBe(false);
+    expect(repo.path).toBe("/other");
+    expect(repo.error).toBe("");
+    expect(repo.externalToolRunning).toBe(false);
+    expect(api.snapshot).toHaveBeenCalledTimes(1);
+  });
+  it("retains a tool error after refreshing the repository", async () => {
+    const { repo } = fixture();
+    await repo.open("/repo");
+    expect(
+      await repo.executeExternalTool(() =>
+        Promise.reject(new Error("tool failed")),
+      ),
+    ).toBe(false);
+    expect(repo.error).toContain("tool failed");
+    expect(repo.busy).toBe(false);
+    expect(repo.externalToolRunning).toBe(false);
+  });
+});

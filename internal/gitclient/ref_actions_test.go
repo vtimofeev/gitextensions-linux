@@ -267,6 +267,7 @@ func TestTagActions(t *testing.T) {
 	}
 	for _, opts := range []RefOptions{
 		{Action: "create-tag", Target: tip, Name: "bad name"},
+		{Action: "create-tag", Target: tip, Name: "bad-light", TagType: "lightweight", Message: "Annotation"},
 		{Action: "create-tag", Target: tip, Name: "--bad"},
 		{Action: "create-tag", Target: tip, Name: "empty", TagType: "annotated"},
 		{Action: "create-tag", Target: tip, Name: "empty", TagType: "signed", Message: " "},

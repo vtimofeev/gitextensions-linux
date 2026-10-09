@@ -40,18 +40,3 @@ See [docs/development.md](docs/development.md).
 - Do not undo other people's edits or existing changes. Check the affected scenarios; see the development guide for the usual checks.
 - Keep English documentation in `.md` and Russian translations next to it in `.ru.md`. Update both versions and their links together. Keep `LICENSE.md` unchanged.
 
-<!-- BEGIN agent-harness -->
-# Global Agent Harness
-
-## Available agents
-
-- `ah-analyzer`: codebase analysis and measurements.
-- `ah-requirement-quality-lead`: requirements analysis and clarification.
-- `ah-fullstack-lead`: fullstack implementation across DevOps, Go, Vue, JS/TS and Node.js.
-- `ah-architect-contracts`: API, event and schema design.
-- `ah-architect-devops`, `ah-architect-go`, `ah-architect-js`, `ah-architect-python`, `ah-architect-vue3`: architecture and task preparation for their respective stacks.
-- `ah-implementer-devops`, `ah-implementer-go`, `ah-implementer-js`, `ah-implementer-python`, `ah-implementer-vue3`: implementation of prepared tasks for their respective stacks.
-- `ah-validator`: independent architecture, quality and readability review.
-
-These agents are available on explicit user request. Their rules are loaded with the selected role.
-<!-- END agent-harness -->

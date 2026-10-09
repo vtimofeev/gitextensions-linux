@@ -408,3 +408,12 @@ func TestBranchDatesAndNewestFirstOutsideHistoryWindow(t *testing.T) {
 		}
 	}
 }
+
+// Isolate trusted tool configuration from the developer's own global Git config.
+func trustedTool(t *testing.T, root, key, value string) {
+	t.Helper()
+	config := filepath.Join(t.TempDir(), "gitconfig")
+	t.Setenv("GIT_CONFIG_GLOBAL", config)
+	t.Setenv("GIT_CONFIG_NOSYSTEM", "1")
+	git(t, root, "config", "--file", config, key, value)
+}

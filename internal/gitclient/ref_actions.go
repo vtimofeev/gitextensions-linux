@@ -52,7 +52,7 @@ func (s *Service) RefAction(path string, opts RefOptions) (string, error) {
 		}
 		// Resolve an exact local/remote ref for branch-only operations, and an object ID for commit actions.
 		ref := opts.Target
-		if opts.Action == "checkout" && !opts.Detach || opts.Action == "rename" || opts.Action == "delete" {
+		if (opts.Action == "checkout" && !opts.Detach) || opts.Action == "rename" || opts.Action == "delete" {
 			prefix := "refs/heads/"
 			if opts.Remote {
 				prefix = "refs/remotes/"
@@ -200,7 +200,12 @@ func (s *Service) tagAction(root string, opts RefOptions) (string, error) {
 			args = append(args, "-f")
 		}
 		switch opts.TagType {
-		case "", "lightweight":
+		case "lightweight":
+			if strings.TrimSpace(opts.Message) != "" {
+				return "", errors.New("lightweight tags cannot have a message")
+			}
+			args = append(args, "--no-sign")
+		case "":
 			if strings.TrimSpace(opts.Message) != "" {
 				args = append(args, "--no-sign", "-a", "-m", opts.Message)
 			}

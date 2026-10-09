@@ -267,7 +267,7 @@ export const ru: Record<MessageKey, string> = {
   toolExecutable: "Путь к программе (необязательно для найденных)",
   trustToolExit: "Считать код завершения инструмента признаком разрешения",
   toolConfigHint:
-    "Поиск идёт в PATH и Git config. Сохранение меняет только настройки этого репозитория. Пользовательские инструменты используют существующий mergetool.<name>.cmd.",
+    "Команды и пути инструментов берутся из global/system-конфига Git. Выбранный инструмент сохраняется для этого репозитория.",
   saveRepositoryTool: "Сохранить для репозитория",
   detectTools: "Повторить поиск",
   launchMergeTool: "Открыть внешний merge-tool",

@@ -239,6 +239,8 @@ export class Repository {
   createTagRequested = 0;
   activity = "";
   busy = false;
+  externalToolRunning = false;
+  private repositoryEpoch = 0;
   error = "";
   output = "";
   tab: "history" | "changes" = "history";
@@ -357,6 +359,7 @@ export class Repository {
 
   async open(path: string) {
     if (this.busy) return;
+    ++this.repositoryEpoch;
     this.busy = true;
     this.activity = "activityOpen";
     this.error = "";
@@ -455,6 +458,33 @@ export class Repository {
       "repository",
       "activityRefresh",
     );
+  }
+  // External viewers keep reads and navigation available. The backend rejects
+  // mutations until the viewer closes, including merge-tool finalization.
+  async executeExternalTool(action: () => Promise<string>): Promise<boolean> {
+    if (this.busy || this.externalToolRunning || !this.path) return false;
+    const path = this.path;
+    const epoch = this.repositoryEpoch;
+    this.externalToolRunning = true;
+    this.error = "";
+    let ok = false;
+    let output = "";
+    let error = "";
+    try {
+      output = await action();
+      ok = true;
+    } catch (e) {
+      error = String(e);
+    } finally {
+      this.externalToolRunning = false;
+    }
+    if (path === this.path && epoch === this.repositoryEpoch) {
+      await this.refresh();
+      // Refresh can itself fail; retain both errors.
+      if (error) this.error = [error, this.error].filter(Boolean).join("\n");
+      this.output = error || output || "✓";
+    }
+    return ok && path === this.path && epoch === this.repositoryEpoch;
   }
   async execute(
     action: () => Promise<string>,

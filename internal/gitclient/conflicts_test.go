@@ -120,7 +120,7 @@ func TestMergeToolDetectionConfigurationAndLaunch(t *testing.T) {
 	if err != nil || len(tools) == 0 {
 		t.Fatalf("tools: %+v %v", tools, err)
 	}
-	git(t, p, "config", "mergetool.custom.cmd", `cp "$REMOTE" "$MERGED"`)
+	trustedTool(t, p, "mergetool.custom.cmd", `cp "$REMOTE" "$MERGED"`)
 	out, err := s.ConfigureMergeTool(p, "custom", "", true)
 	requireOK(t, out, err)
 	tools, err = s.MergeTools(p)
@@ -152,7 +152,7 @@ func TestMergeToolDetectionConfigurationAndLaunch(t *testing.T) {
 func TestMergeToolCannotSilentlyStageMarkers(t *testing.T) {
 	t.Setenv("GIT_CONFIG_GLOBAL", "/dev/null")
 	p, s := conflicted(t)
-	git(t, p, "config", "mergetool.custom.cmd", "true")
+	trustedTool(t, p, "mergetool.custom.cmd", "true")
 	out, err := s.ConfigureMergeTool(p, "custom", "", true)
 	requireOK(t, out, err)
 	if _, err = s.RunMergeTool(p, "shared", "custom"); err == nil || !strings.Contains(err.Error(), "markers") {
@@ -165,7 +165,7 @@ func TestMergeToolCannotSilentlyStageMarkers(t *testing.T) {
 func TestMergeToolCancellation(t *testing.T) {
 	t.Setenv("GIT_CONFIG_GLOBAL", "/dev/null")
 	p, s := conflicted(t)
-	git(t, p, "config", "mergetool.slow.cmd", `touch "$MERGED.started"; sleep 30`)
+	trustedTool(t, p, "mergetool.slow.cmd", `touch "$MERGED.started"; sleep 30`)
 	out, err := s.ConfigureMergeTool(p, "slow", "", true)
 	requireOK(t, out, err)
 	finished := make(chan error, 1)
@@ -181,6 +181,27 @@ func TestMergeToolCancellation(t *testing.T) {
 			t.Fatal("external tool did not start")
 		}
 		time.Sleep(10 * time.Millisecond)
+	}
+
+	// Reads remain available, but mutations must not race tool finalization.
+	readDone := make(chan error, 1)
+	go func() { _, err := s.WorkingState(p); readDone <- err }()
+	select {
+	case err := <-readDone:
+		if err != nil {
+			t.Fatal(err)
+		}
+	case <-time.After(time.Second):
+		s.CancelMergeTool()
+		t.Fatal("tool blocked repository reads")
+	}
+	if _, err := s.Stage(p, []string{"shared"}); err == nil {
+		s.CancelMergeTool()
+		t.Fatal("mutation raced merge tool")
+	}
+	if _, err := s.SetIdentity(p, "Other", "other@example.test"); err == nil {
+		s.CancelMergeTool()
+		t.Fatal("identity mutation raced merge tool")
 	}
 
 	s.CancelMergeTool()

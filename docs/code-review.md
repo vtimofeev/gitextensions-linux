@@ -30,4 +30,4 @@ Auto mode chooses an available terminal. Terminal launch errors appear in the ap
 The request is also saved in a private file under `$XDG_CACHE_HOME/gitextensions-linux/reviews`, or the system user-cache folder.
 If command arguments exceed 100 KiB, task details are shortened with a warning. Instructions are never silently shortened.
 To pass the whole request, use `{promptFile}` with a file-input option supported by the tool itself.
-You may delete these files after the terminal session ends.
+Recent prompt files remain available to terminal sessions; files older than 30 days are removed when starting another review. You may delete them after the session ends.

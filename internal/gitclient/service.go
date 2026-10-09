@@ -7,17 +7,18 @@ import (
 	"fmt"
 	"io"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"strconv"
 	"strings"
 	"sync"
-	"time"
+	"syscall"
 )
 
-// Service serializes repository reads and mutations for a coherent desktop session.
+// Service protects repository preparation and finalization. Long-running
+// operations release the mutex for reads while retaining an exclusive writer slot.
 type Service struct {
 	mu         sync.Mutex
+	mutating   bool
 	toolMu     sync.Mutex
 	toolCancel context.CancelFunc
 }
@@ -27,6 +28,12 @@ func NewService() *Service { return &Service{} }
 type limitedBuffer struct {
 	bytes.Buffer
 	truncated bool
+}
+
+// bytes.Buffer.ReadFrom is promoted by embedding and would bypass Write when
+// os/exec copies pipe output. Hide ReaderFrom on the destination during copying.
+func (b *limitedBuffer) ReadFrom(r io.Reader) (int64, error) {
+	return io.Copy(struct{ io.Writer }{b}, r)
 }
 
 func (b *limitedBuffer) Write(p []byte) (int, error) {
@@ -44,11 +51,12 @@ func (b *limitedBuffer) Write(p []byte) (int, error) {
 	return n, nil
 }
 func (s *Service) run(path, input string, args ...string) (string, error) {
-	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Minute)
+	ctx, cancel := context.WithTimeout(context.Background(), gitTimeout(args[0]))
 	defer cancel()
-	cmd := exec.CommandContext(ctx, "git", args...)
-	cmd.Dir = path
-	cmd.Env = append(os.Environ(), "GIT_TERMINAL_PROMPT=0", "GIT_LITERAL_PATHSPECS=1", "LC_ALL=C", "GIT_EDITOR=true", "GIT_SEQUENCE_EDITOR=true")
+	cmd := gitCommand(ctx, path, args...)
+	if gitReadCommand(args[0]) {
+		cmd.Env = append(cmd.Env, "GIT_OPTIONAL_LOCKS=0")
+	}
 	// stash --keep-index internally uses the magic :/ pathspec. No stash API
 	// accepts user pathspecs, so literal mode must be disabled for this command.
 	if len(args) > 0 && args[0] == "stash" {
@@ -58,7 +66,17 @@ func (s *Service) run(path, input string, args ...string) (string, error) {
 	var out, stderr limitedBuffer
 	cmd.Stdout = &out
 	cmd.Stderr = &stderr
-	if err := cmd.Run(); err != nil {
+	// Hooks, signing and network helpers may outlive an ordinary UI read. Keep
+	// mutations exclusive through mutating, but let readers use the mutex.
+	var commandErr error
+	if s.mutating && longGitCommand(args[0]) {
+		s.mu.Unlock()
+		commandErr = cmd.Run()
+		s.mu.Lock()
+	} else {
+		commandErr = cmd.Run()
+	}
+	if err := commandErr; err != nil {
 		if ctx.Err() != nil {
 			return "", fmt.Errorf("git %s: %w; refresh repository state", args[0], ctx.Err())
 		}
@@ -69,12 +87,19 @@ func (s *Service) run(path, input string, args ...string) (string, error) {
 		return "", fmt.Errorf("git %s: %s", args[0], message)
 	}
 	result := out.String()
-	if out.truncated {
-		result += "\n[Preview truncated at 4 MiB]\n"
-	}
+	mutationOutput := false
 	switch args[0] {
 	case "switch", "branch", "add", "reset", "rm", "commit", "push", "pull", "fetch", "merge", "rebase", "cherry-pick", "revert":
+		mutationOutput = true
+	}
+	if out.truncated && !mutationOutput {
+		return "", fmt.Errorf("git %s output exceeds 4 MiB; narrow the request", args[0])
+	}
+	if mutationOutput {
 		result += stderr.String()
+		if out.truncated || stderr.truncated {
+			result += "\n[Command output truncated at 4 MiB]"
+		}
 	}
 	return result, nil
 }
@@ -110,7 +135,10 @@ func (s *Service) HistorySnapshot(path string, limit int, author string) (Snapsh
 		return Snapshot{}, err
 	}
 	result := Snapshot{Path: root, Commits: []Commit{}, Branches: []Branch{}, Files: []FileStatus{}, Remotes: []string{}}
-	result.HomePath, _ = os.UserHomeDir()
+	// Home is optional display metadata; a missing HOME must not block Git.
+	if home, err := os.UserHomeDir(); err == nil {
+		result.HomePath = home
+	}
 	branch, e := s.run(root, "", "symbolic-ref", "--quiet", "--short", "HEAD")
 	if e == nil {
 		result.Branch = strings.TrimSpace(branch)
@@ -165,10 +193,10 @@ func (s *Service) HistorySnapshot(path string, limit int, author string) (Snapsh
 		return result, err
 	}
 	result.Files, err = parseStatus(out)
-	result.DirtyCount = dirtyCount(result.Files)
 	if err != nil {
 		return result, err
 	}
+	result.DirtyCount = dirtyCount(result.Files)
 	out, err = s.run(root, "", "remote")
 	if err != nil {
 		return result, err
@@ -231,14 +259,42 @@ func (s *Service) branchName(root, name string) error {
 	return err
 }
 func (s *Service) mutation(path string, action func(string) (string, error)) (string, error) {
+	return s.withRepository(path, repositoryMutation, action)
+}
+
+type repositoryAccess int
+
+const (
+	repositoryRead repositoryAccess = iota
+	repositoryMutation
+	repositoryTool
+)
+
+// Protect preparation/finalization, while permitting reads during external
+// processes. Concurrent writers fail promptly rather than waiting on a GUI or SSH.
+func (s *Service) withRepository(path string, access repositoryAccess, action func(string) (string, error)) (string, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
+	if access != repositoryRead && s.mutating {
+		return "", errors.New("another repository operation is already running")
+	}
+	if access == repositoryMutation {
+		s.toolMu.Lock()
+		active := s.toolCancel != nil
+		s.toolMu.Unlock()
+		if active {
+			return "", errors.New("close the external tool before changing the repository")
+		}
+		s.mutating = true
+		defer func() { s.mutating = false }()
+	}
 	root, err := s.root(path)
 	if err != nil {
 		return "", err
 	}
 	return action(root)
 }
+
 func (s *Service) Checkout(path, branch string) (string, error) {
 	return s.mutation(path, func(root string) (string, error) {
 		if err := s.branchName(root, branch); err != nil {
@@ -286,7 +342,7 @@ func validatePaths(files []string) error {
 		return errors.New("select at least one file")
 	}
 	for _, p := range files {
-		if p == "" || filepath.IsAbs(p) || p == ".." || strings.HasPrefix(filepath.Clean(p), "../") || strings.ContainsRune(p, 0) {
+		if !filepath.IsLocal(p) || strings.ContainsRune(p, 0) {
 			return errors.New("invalid repository-relative path")
 		}
 	}
@@ -480,7 +536,7 @@ func (s *Service) Diff(path, file, area, revision string) (string, error) {
 		if e != nil || relative == ".." || strings.HasPrefix(relative, "../") {
 			return "", errors.New("file points outside the repository")
 		}
-		f, e := os.Open(resolved)
+		f, e := os.OpenFile(resolved, os.O_RDONLY|syscall.O_NONBLOCK, 0)
 		if e != nil {
 			return "", e
 		}
@@ -511,24 +567,25 @@ func (s *Service) Diff(path, file, area, revision string) (string, error) {
 }
 
 func (s *Service) activeOperation(root string) (string, error) {
+	directory, err := s.run(root, "", "rev-parse", "--absolute-git-dir")
+	if err != nil {
+		return "", err
+	}
+	directory = strings.TrimSuffix(directory, "\n")
 	for _, state := range []struct{ file, name string }{{"rebase-merge", "rebase"}, {"rebase-apply", "rebase"}, {"MERGE_HEAD", "merge"}, {"CHERRY_PICK_HEAD", "cherry-pick"}, {"REVERT_HEAD", "revert"}, {"sequencer", "cherry-pick"}} {
-		p, e := s.run(root, "", "rev-parse", "--git-path", state.file)
-		if e != nil {
+		path := filepath.Join(directory, state.file)
+		if _, err := os.Stat(path); os.IsNotExist(err) {
 			continue
+		} else if err != nil {
+			return "", err
 		}
-		p = strings.TrimSpace(p)
-		if !filepath.IsAbs(p) {
-			p = filepath.Join(root, p)
-		}
-		if _, e = os.Stat(p); e == nil {
-			if state.file == "sequencer" {
-				todo, err := os.ReadFile(filepath.Join(p, "todo"))
-				if err == nil && strings.HasPrefix(strings.TrimSpace(string(todo)), "revert ") {
-					return "revert", nil
-				}
+		if state.file == "sequencer" {
+			todo, err := os.ReadFile(filepath.Join(path, "todo"))
+			if err == nil && strings.HasPrefix(strings.TrimSpace(string(todo)), "revert ") {
+				return "revert", nil
 			}
-			return state.name, nil
 		}
+		return state.name, nil
 	}
 	return "", nil
 }

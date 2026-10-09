@@ -104,22 +104,20 @@ class ExternalDiffDialog extends Vue {
   async launch() {
     const target = this.store.diffToolTarget;
     if (!target || !this.ready || this.store.busy) return;
+    const token = this.generation;
     this.running = true;
     container.preferences.setMergeTool(this.tool);
-    const ok = await this.store.execute(
-      () =>
-        container.api.runDiffTool(
-          this.store.path,
-          target.file,
-          target.area,
-          target.revision,
-          this.tool,
-        ),
-      true,
-      "working",
+    const ok = await this.store.executeExternalTool(() =>
+      container.api.runDiffTool(
+        this.store.path,
+        target.file,
+        target.area,
+        target.revision,
+        this.tool,
+      ),
     );
     this.running = false;
-    if (ok) this.close();
+    if (ok && token === this.generation) this.close();
   }
   async cancel() {
     try {

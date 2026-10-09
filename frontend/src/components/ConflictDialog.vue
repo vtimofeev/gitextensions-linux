@@ -281,9 +281,12 @@ class ConflictDialog extends Vue {
     }
   }
   async launch() {
+    const path = this.store.path,
+      file = this.store.conflictFile,
+      token = this.generation;
     this.toolRunning = true;
     container.preferences.setMergeTool(this.tool);
-    await this.store.execute(() =>
+    await this.store.executeExternalTool(() =>
       container.api.runMergeTool(
         this.store.path,
         this.store.conflictFile,
@@ -292,6 +295,12 @@ class ConflictDialog extends Vue {
     );
     this.toolRunning = false;
     if (
+      token !== this.generation ||
+      path !== this.store.path ||
+      file !== this.store.conflictFile
+    )
+      return;
+    if (
       !this.store.snapshot?.files.some(
         (f) => f.path === this.store.conflictFile && f.conflict,
       )
@@ -299,8 +308,14 @@ class ConflictDialog extends Vue {
       this.close();
     else {
       const error = this.store.error;
+      const reloadToken = this.generation + 1;
       await this.load();
-      this.store.error = error;
+      if (
+        reloadToken === this.generation &&
+        path === this.store.path &&
+        file === this.store.conflictFile
+      )
+        this.store.error = error;
     }
   }
   async cancelTool() {

@@ -4,48 +4,69 @@
 
 ## Готовая сборка
 
-Для Ubuntu 22.04 и сборки с WebKitGTK 4.0:
+Установите библиотеки для вашего дистрибутива и ABI WebKitGTK, с которым собран архив:
+
+| Дистрибутив | Пакеты для запуска | ABI |
+| --- | --- | --- |
+| Ubuntu 22.04 | `sudo apt install git libgtk-3-0 libwebkit2gtk-4.0-37` | 4.0 |
+| Debian 12 | `sudo apt install git libgtk-3-0 libwebkit2gtk-4.1-0` | 4.1 |
+| Debian 13 / Ubuntu 24.04+ | `sudo apt install git libgtk-3-0t64 libwebkit2gtk-4.1-0` | 4.1 |
+| Fedora 40+ | `sudo dnf install git gtk3 webkit2gtk4.1` | 4.1 |
+| Arch / Manjaro | `sudo pacman -Syu git gtk3 webkit2gtk-4.1` | 4.1 |
+| openSUSE | `sudo zypper install git libgtk-3-0 libwebkit2gtk-4_1-0` | 4.1 |
+
+Названия пакетов сверены с [Wails](https://wails.io/docs/guides/linux-distro-support/) и [пакетом GTK в Debian 13](https://packages.debian.org/trixie/libgtk-3-0t64).
+Бинарник для Ubuntu 22.04 использует ABI 4.0. Установка библиотек 4.1 не делает его совместимым: нужна соответствующая сборка или сборка из исходников на целевой системе.
+Архитектура процессора и glibc тоже должны быть совместимы. Бинарник, собранный на новом дистрибутиве, может не запуститься на старом.
+
+Распакуйте архив в отдельную папку и установите приложение без `sudo`:
 
 ```sh
-sudo apt install git libgtk-3-0 libwebkit2gtk-4.0-37
 mkdir -p gitextensions-linux-release
 tar -xzf gitextensions-linux-amd64.tar.gz -C gitextensions-linux-release
 cd gitextensions-linux-release
 ./build/linux/install.sh
 ```
 
-Установщик работает без `sudo`: кладёт бинарник в `~/.local/bin`, launcher и иконки в `${XDG_DATA_HOME:-~/.local/share}`, ярлык — в пользовательский каталог рабочего стола.
-Go и Node.js для запуска готовой сборки не нужны. Архитектура и ABI GTK/WebKitGTK должны совпадать с целевой системой.
+Бинарник попадёт в `~/.local/bin`, launcher и иконки — в `${XDG_DATA_HOME:-~/.local/share}`. Ярлык рабочего стола устанавливается, если этот каталог включён в настройках XDG.
+Go и Node.js для запуска готовой сборки не нужны.
 
 ```sh
-~/.local/bin/gitextensions-linux
 ~/.local/bin/gitextensions-linux --repo "/path/to/repository"
 ```
 
-Перед повторной установкой закройте приложение. Новое имя иконки включает хеш её содержимого, чтобы GNOME не использовал старую картинку из кеша.
+## GNOME и обновления
 
-## GNOME / Ubuntu
+Перед повторной установкой закройте приложение. Имя иконки фиксировано: `gitextensions-linux`, как у desktop-файла и идентификатора окна GTK.
+Установщик обновляет кеши launcher и иконок. Если в панели остался стандартный значок, удалите старое закрепление, запустите **Git Extensions Linux** из меню приложений и закрепите заново. Если GNOME сохранил кеш, выйдите из сеанса и войдите снова.
 
-Если ярлык на рабочем столе требует разрешения, нажмите правой кнопкой **Разрешить запуск / Allow Launching**.
-Если файлы рабочего стола вообще не видны, проверьте расширение **Desktop Icons NG (DING)**.
-Отключённый в XDG-настройках рабочий стол пропускается; launcher меню устанавливается всегда.
-Меню запускает бинарник напрямую из `~/.local/bin`, даже если этого каталога нет в `PATH`.
+Для ярлыка рабочего стола нажмите правой кнопкой **Разрешить запуск / Allow Launching**. В Ubuntu для отображения файлов рабочего стола может понадобиться **Desktop Icons NG (DING)**.
+Launcher работает, даже если `~/.local/bin` отсутствует в `PATH`.
 
 ## Сборка из исходников
 
-Нужны Go 1.25+, Node.js LTS и npm. Для Ubuntu 22.04:
+Установите Go 1.25+, Node.js LTS и npm, а также системные пакеты для сборки:
+
+| Дистрибутив | Пакеты для сборки |
+| --- | --- |
+| Ubuntu 22.04 (ABI 4.0) | `sudo apt install git build-essential pkg-config libgtk-3-dev libwebkit2gtk-4.0-dev` |
+| Debian 12/13 / Ubuntu 24.04+ (ABI 4.1) | `sudo apt install git build-essential pkg-config libgtk-3-dev libwebkit2gtk-4.1-dev` |
+| Fedora (ABI 4.1) | `sudo dnf install git gcc gcc-c++ make pkgconf-pkg-config gtk3-devel webkit2gtk4.1-devel` |
+| Arch / Manjaro (ABI 4.1) | `sudo pacman -Syu git base-devel gtk3 webkit2gtk-4.1` |
+
+Подробности: [WebKit для сборки в Fedora](https://packages.fedoraproject.org/pkgs/webkitgtk/webkit2gtk4.1-devel/) и [пакет Arch](https://archlinux.org/packages/extra/x86_64/webkit2gtk-4.1/). Для openSUSE и других дистрибутивов сверяйтесь с [инструкцией Wails](https://wails.io/docs/gettingstarted/installation/); `wails doctor` проверяет системные зависимости.
+
+Из корня проекта:
 
 ```sh
-sudo apt install git build-essential pkg-config libgtk-3-dev libwebkit2gtk-4.0-dev
 go install github.com/wailsapp/wails/v2/cmd/wails@v2.15.0
 export PATH="$(go env GOPATH)/bin:$PATH"
 wails doctor
-wails build
+wails build -tags webkit2_41
 ```
 
-Команды выполняются из корня проекта. Результат — `build/bin/gitextensions-linux` со встроенным интерфейсом и PNG-иконкой.
-На системах с WebKitGTK 4.1 установите `libwebkit2gtk-4.1-dev` и собирайте командой `wails build -tags webkit2_41`.
-Подробности других дистрибутивов: [Wails installation](https://wails.io/docs/gettingstarted/installation/).
+Для ABI 4.0 замените последнюю команду на `wails build`.
+Результат — `build/bin/gitextensions-linux` со встроенным интерфейсом и PNG-иконкой. Установка: `./build/linux/install.sh`.
 
 ## Перенос и исходники
 
@@ -55,10 +76,9 @@ wails build
 python3 build/linux/package.py
 ```
 
-Архив `build/bin/gitextensions-linux-amd64.tar.gz` содержит установщик, иконки, английские и русские инструкции, `LICENSE.md`, сведения об авторах, лицензии зависимостей и снимок исходников в `source/`.
-Для изменения и повторной сборки приложения перейдите в `source/` и выполните инструкции выше.
-Передавайте исходники вместе с бинарником: [условия GPL и заимствования](../NOTICE.ru.md).
-Для упаковки нужны Python 3, Git, Go и установленные npm-зависимости.
+`build/bin/gitextensions-linux-amd64.tar.gz` включает установщик, иконки, EN/RU инструкции, `LICENSE.md`, атрибуцию, лицензии зависимостей и соответствующие сборке исходники в `source/`.
+Для пересборки откройте `source/` и выполните команды выше. Передавайте исходники вместе с бинарником: [GPL и адаптированный код](../NOTICE.ru.md).
+Упаковке нужны Python 3, Git, Go и установленные npm-зависимости.
 
 ## Удаление
 
@@ -69,5 +89,5 @@ rm -f "${XDG_DATA_HOME:-$HOME/.local/share}"/icons/hicolor/256x256/apps/gitexten
 rm -f "${XDG_DATA_HOME:-$HOME/.local/share}"/icons/hicolor/scalable/apps/gitextensions-linux*.svg
 ```
 
-Удалите также `gitextensions-linux.desktop` из своего каталога рабочего стола.
-Репозитории и их Git-настройки установщик не изменяет.
+Также удалите `gitextensions-linux.desktop` из каталога рабочего стола.
+Установщик не меняет репозитории и их настройки Git.

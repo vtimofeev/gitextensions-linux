@@ -8,8 +8,6 @@ import (
 	"os/exec"
 	"path/filepath"
 	"strings"
-	"syscall"
-	"time"
 )
 
 // Read blob bytes without text conversion or preview truncation.
@@ -42,17 +40,11 @@ func (s *Service) diffBlob(root, tree, file string) ([]byte, error) {
 	if fields[0] == "160000" {
 		return []byte(hash + "\n"), nil
 	}
-	cmd := exec.Command("git", "cat-file", "blob", hash)
-	cmd.Dir = root
-	var data, stderr limitedBuffer
-	cmd.Stdout, cmd.Stderr = &data, &stderr
-	if err = cmd.Run(); err != nil {
-		return nil, fmt.Errorf("read diff blob: %s: %w", stderr.String(), err)
+	data, err := s.run(root, "", "cat-file", "blob", hash)
+	if err != nil {
+		return nil, err
 	}
-	if data.truncated {
-		return nil, errors.New("file versions above 4 MiB are not supported")
-	}
-	return data.Bytes(), nil
+	return []byte(data), nil
 }
 
 // RunDiffTool compares isolated snapshots, never auto-staging or editing repository files.
@@ -67,7 +59,7 @@ func (s *Service) RunDiffTool(path, file, area, revision, name string) (string, 
 	s.toolCancel = cancel
 	s.toolMu.Unlock()
 	defer func() { cancel(); s.toolMu.Lock(); s.toolCancel = nil; s.toolMu.Unlock() }()
-	return s.mutation(path, func(root string) (string, error) {
+	return s.withRepository(path, repositoryTool, func(root string) (string, error) {
 		if err := validatePaths([]string{file}); err != nil {
 			return "", err
 		}
@@ -150,20 +142,13 @@ func (s *Service) RunDiffTool(path, file, area, revision, name string) (string, 
 				if e != nil {
 					return "", e
 				}
-				parts := strings.Split(names, "\x00")
-				for i := 0; i+1 < len(parts); {
-					kind := parts[i]
-					i++
-					if strings.HasPrefix(kind, "R") || strings.HasPrefix(kind, "C") {
-						if i+1 >= len(parts) {
-							break
-						}
-						if parts[i+1] == file {
-							original = parts[i]
-						}
-						i += 2
-					} else {
-						i++
+				changes, e := parseNameStatus(names)
+				if e != nil {
+					return "", e
+				}
+				for _, change := range changes {
+					if change.Path == file && change.OriginalPath != "" {
+						original = change.OriginalPath
 					}
 				}
 				left, err = s.diffBlob(root, parent, original)
@@ -194,32 +179,14 @@ func (s *Service) RunDiffTool(path, file, area, revision, name string) (string, 
 		if err := os.WriteFile(after, right, 0600); err != nil {
 			return "", err
 		}
-		args := []string{}
-		if tool.Path != "" {
-			args = append(args, "-c", "difftool."+name+".path="+tool.Path)
-		}
-		if tool.Custom {
-			command := s.config(root, "difftool."+name+".cmd")
-			if command == "" {
-				command = `BASE="$LOCAL"; MERGED="$REMOTE"; ` + s.config(root, "mergetool."+name+".cmd")
-			}
-			args = append(args, "-c", "difftool."+name+".cmd="+command)
-		}
+		args := s.toolConfigArgs(root, name, "difftool")
 		args = append(args, "difftool", "--no-index", "--no-prompt", "--trust-exit-code", "--tool="+name, "--", before, after)
-		cmd := exec.CommandContext(ctx, "git", args...)
-		cmd.Dir = root
-		cmd.Env = append(os.Environ(), "GIT_TERMINAL_PROMPT=0", "GIT_LITERAL_PATHSPECS=1", "LC_ALL=C")
-		cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
-		cmd.Cancel = func() error {
-			if cmd.Process == nil {
-				return nil
-			}
-			return syscall.Kill(-cmd.Process.Pid, syscall.SIGTERM)
-		}
-		cmd.WaitDelay = time.Second
+		cmd := gitCommand(ctx, root, args...)
 		var stdout, stderr limitedBuffer
 		cmd.Stdout, cmd.Stderr = &stdout, &stderr
+		s.mu.Unlock()
 		err = cmd.Run()
+		s.mu.Lock()
 		if ctx.Err() != nil {
 			return "", errors.New("external comparison cancelled")
 		}

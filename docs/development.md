@@ -60,3 +60,16 @@ The archive includes the binary, installer, icons, documentation, sources and li
 Sources come from the current working tree, including new project files. The source snapshot excludes `.git`, dependencies, caches and test output.
 Before a public release, check the archive contents and publish the exact sources with the build.
 English guides use `.md`; Russian versions sit next to them as `.ru.md`. Keep both versions up to date.
+
+## External Git tools
+
+Commands and executable paths are read only from global/system Git config; repository-local commands are ignored. The settings screen saves executable paths and exit-code trust in the global config, and the chosen tool name in the repository config.
+For a custom tool, configure a command you trust, for example:
+
+```sh
+git config --global mergetool.custom.cmd 'meld "$LOCAL" "$REMOTE" "$MERGED"'
+```
+
+External tool sessions allow repository reads. Close the tool before changing the repository. Long Git mutations have a 30-minute timeout; reads have a 3-minute timeout. Cancellation terminates the Git process group. Reads also remain available during long Git mutations; another mutation is rejected until completion.
+
+Merge tools receive private snapshots and edit the worktree file. The original is saved beside it as `.gitextensions-merge-backup-*`; the result/error reports the backup path. Backups survive failures and cancellation. Successful runs remove them only when `mergetool.keepBackup=false`. If another Git client changes the conflict index while the tool is open, automatic staging stops for manual inspection.

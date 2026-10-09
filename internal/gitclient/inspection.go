@@ -225,47 +225,11 @@ func (s *Service) FileHistory(path, file, revision string) ([]FileRevision, erro
 	if err != nil {
 		return nil, err
 	}
-	out, err := s.run(root, "", "log", "--follow", "-z", "--max-count=100", "--format=%H%x00%P%x00%an%x00%aI%x00%s%x00%D%x00%ae", rev, "--", file)
+	out, err := s.run(root, "", "log", "--follow", "--name-status", "-z", "--max-count=100", "--format=%H%x00%P%x00%an%x00%aI%x00%s%x00%D%x00%ae", rev, "--", file)
 	if err != nil {
 		return nil, err
 	}
-	commits, err := parseLog(out)
-	if err != nil {
-		return nil, err
-	}
-	result := []FileRevision{}
-	for _, commit := range commits {
-		result = append(result, FileRevision{Commit: commit, File: file})
-		if len(commit.Parents) == 0 {
-			continue
-		}
-		changes, e := s.run(root, "", "diff-tree", "--no-commit-id", "-r", "-M", "--name-status", "-z", commit.Parents[0], commit.Hash)
-		if e != nil {
-			return nil, e
-		}
-		f := strings.Split(changes, "\x00")
-		for i := 0; i < len(f)-1; {
-			status := f[i]
-			i++
-			if status == "" {
-				break
-			}
-			old := f[i]
-			i++
-			if strings.HasPrefix(status, "R") || strings.HasPrefix(status, "C") {
-				if i >= len(f) {
-					break
-				}
-				newPath := f[i]
-				i++
-				if newPath == file && strings.HasPrefix(status, "R") {
-					result[len(result)-1].OriginalPath = old
-					file = old
-				}
-			}
-		}
-	}
-	return result, nil
+	return parseFileHistory(out, file)
 }
 
 // FileDiff compares the selected file revision with its first parent, including roots.
@@ -292,18 +256,13 @@ func (s *Service) FileDiff(path, file, revision string, fullContext bool) (strin
 	if err != nil {
 		return "", err
 	}
-	fields := strings.Split(changes, "\x00")
-	for i := 0; i+1 < len(fields); {
-		status, old := fields[i], fields[i+1]
-		i += 2
-		if strings.HasPrefix(status, "R") || strings.HasPrefix(status, "C") {
-			if i >= len(fields) {
-				break
-			}
-			if fields[i] == file && strings.HasPrefix(status, "R") {
-				paths = append(paths, old)
-			}
-			i++
+	entries, err := parseNameStatus(changes)
+	if err != nil {
+		return "", err
+	}
+	for _, change := range entries {
+		if change.Path == file && strings.HasPrefix(change.Kind, "R") {
+			paths = append(paths, change.OriginalPath)
 		}
 	}
 	args := []string{"show", "--format=", "--first-parent", "-M", "--no-ext-diff", "--no-textconv", "--no-color"}
@@ -480,9 +439,6 @@ func (s *Service) Blame(path, file, revision string, options ...BlameOptions) ([
 	out, err := s.run(root, "", blameArgs(rev, file, opts)...)
 	if err != nil {
 		return nil, err
-	}
-	if strings.Contains(out, "[Preview truncated at 4 MiB]") {
-		return nil, errors.New("blame output exceeds 4 MiB")
 	}
 	return parseBlame(out, len(data) > 0)
 }

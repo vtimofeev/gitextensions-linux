@@ -264,7 +264,7 @@ export const en = {
   toolExecutable: "Executable path (optional for detected tools)",
   trustToolExit: "Trust tool exit code for resolution",
   toolConfigHint:
-    "Available tools are detected from PATH and Git config. Save writes only this repository’s Git config. Custom tools use their existing mergetool.<name>.cmd.",
+    "Tool commands and executable paths use global/system Git config. The selected tool is saved for this repository.",
   saveRepositoryTool: "Save as repository tool",
   detectTools: "Detect again",
   launchMergeTool: "Open external merge tool",

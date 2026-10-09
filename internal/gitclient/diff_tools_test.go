@@ -21,7 +21,7 @@ func TestExternalDiffSnapshots(t *testing.T) {
 	write(t, p, "shared.txt", "worktree\n")
 	capture := filepath.Join(t.TempDir(), "captured")
 	command := `cat "$LOCAL" > '` + capture + `.before'; cat "$REMOTE" > '` + capture + `.after'; printf edited > "$REMOTE"`
-	git(t, p, "config", "mergetool.capture.cmd", command)
+	trustedTool(t, p, "mergetool.capture.cmd", command)
 	for _, c := range []struct{ area, rev, left, right string }{
 		{"staged", "", "base\n", "index\n"},
 		{"unstaged", "", "index\n", "worktree\n"},
@@ -67,7 +67,7 @@ func TestExternalDiffRenameAndDeletion(t *testing.T) {
 	write(t, p, "new.txt", "original\nline2\nline3\nchanged\n")
 	git(t, p, "add", "new.txt")
 	capture := filepath.Join(t.TempDir(), "before")
-	git(t, p, "config", "mergetool.capture.cmd", `cat "$LOCAL" > '`+capture+`'`)
+	trustedTool(t, p, "mergetool.capture.cmd", `cat "$LOCAL" > '`+capture+`'`)
 	out, err := s.RunDiffTool(p, "new.txt", "staged", "", "capture")
 	requireOK(t, out, err)
 	content, _ := os.ReadFile(capture)
@@ -94,7 +94,7 @@ func TestExternalDiffRenameAndDeletion(t *testing.T) {
 
 func TestExternalDiffRejectsInvalidRequests(t *testing.T) {
 	p, s := conflicted(t)
-	git(t, p, "config", "mergetool.capture.cmd", "true")
+	trustedTool(t, p, "mergetool.capture.cmd", "true")
 	for _, c := range []struct{ file, area, rev, tool string }{{"shared", "unstaged", "", "capture"}, {"../outside", "untracked", "", "capture"}, {"shared", "unknown", "", "capture"}, {"shared", "commit", "invalid", "capture"}, {"shared", "commit", "HEAD", "absent"}} {
 		if _, err := s.RunDiffTool(p, c.file, c.area, c.rev, c.tool); err == nil {
 			t.Fatalf("accepted invalid request: %+v", c)
@@ -107,7 +107,7 @@ func TestExternalDiffToolFailure(t *testing.T) {
 	s := NewService()
 	commitFile(t, p, "file", "old\n", "base")
 	write(t, p, "file", "new\n")
-	git(t, p, "config", "mergetool.failure.cmd", "exit 1")
+	trustedTool(t, p, "mergetool.failure.cmd", "exit 1")
 	if _, err := s.RunDiffTool(p, "file", "unstaged", "", "failure"); err == nil {
 		t.Fatal("failed viewer reported success")
 	}

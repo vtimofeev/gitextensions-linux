@@ -26,17 +26,12 @@ validate_paths() {
 }
 
 install_files() {
-  local icon_hash icon_name
-  icon_hash=$(cat -- "$png_icon" "$svg_icon" | sha256sum)
-  icon_name="$app_id-${icon_hash:0:12}"
-
   install -D -m 755 -- "$binary" "$bin_dir/$app_id"
-  # A new icon name makes GNOME reload the image when its contents change.
-  install -D -m 644 -- "$png_icon" "$icons_dir/256x256/apps/$icon_name.png"
-  install -D -m 644 -- "$svg_icon" "$icons_dir/scalable/apps/$icon_name.svg"
+  # Keep the icon name identical to the desktop ID and GTK program name.
+  install -D -m 644 -- "$png_icon" "$icons_dir/256x256/apps/$app_id.png"
+  install -D -m 644 -- "$svg_icon" "$icons_dir/scalable/apps/$app_id.svg"
   # The launcher expands HOME at startup; no generated Exec line is needed.
   install -D -m 644 -- "$script_dir/$app_id.desktop" "$launcher"
-  sed -i "s/^Icon=.*/Icon=$icon_name/" "$launcher"
 }
 
 install_desktop_shortcut() {
@@ -60,7 +55,7 @@ refresh_caches() {
   if command -v update-desktop-database >/dev/null; then
     update-desktop-database "$data_dir/applications"
   fi
-  if command -v gtk-update-icon-cache >/dev/null && [[ -f "$icons_dir/index.theme" ]]; then
+  if command -v gtk-update-icon-cache >/dev/null; then
     gtk-update-icon-cache -f -t "$icons_dir"
   fi
 }

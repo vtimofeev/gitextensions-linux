@@ -8,6 +8,7 @@ import (
 	"path/filepath"
 	"strings"
 	"syscall"
+	"time"
 	"unicode"
 	"unicode/utf8"
 )
@@ -173,7 +174,7 @@ func reviewArgsSize(args []string) int {
 }
 
 func (s *Service) StartReview(path string, opts ReviewOptions) (string, error) {
-	return s.mutation(path, func(root string) (string, error) {
+	return s.withRepository(path, repositoryRead, func(root string) (string, error) {
 		template, known := reviewTemplates[opts.Tool]
 		if !known {
 			return "", errors.New("choose a code review tool")
@@ -205,6 +206,7 @@ func (s *Service) StartReview(path string, opts ReviewOptions) (string, error) {
 		if err = os.MkdirAll(directory, 0700); err != nil {
 			return "", err
 		}
+		cleanupReviewPrompts(directory, time.Now())
 		file, err := os.CreateTemp(directory, "prompt-*.txt") // CreateTemp uses 0600
 		if err != nil {
 			return "", err
@@ -283,6 +285,7 @@ func (s *Service) StartReview(path string, opts ReviewOptions) (string, error) {
 		for _, argv := range candidates {
 			cmd := exec.Command(argv[0], argv[1:]...)
 			cmd.Dir = root
+			cmd.Env = gitEnvironment()
 			cmd.SysProcAttr = &syscall.SysProcAttr{Setsid: true}
 			if launchErr = cmd.Start(); launchErr != nil {
 				continue
@@ -290,7 +293,7 @@ func (s *Service) StartReview(path string, opts ReviewOptions) (string, error) {
 			started = true
 			// Reap without tying the terminal lifetime to Wails/app cancellation.
 			// File templates can outlive terminal launchers (e.g. gnome-terminal), so
-			// retain their private cache file until the user removes it.
+			// retain their private cache file until cache expiry.
 			usesFile := strings.Contains(template, "{promptFile}")
 			go func() {
 				_ = cmd.Wait()
@@ -305,4 +308,22 @@ func (s *Service) StartReview(path string, opts ReviewOptions) (string, error) {
 		}
 		return "", fmt.Errorf("start review terminal: %w", launchErr)
 	})
+}
+
+// Terminal launchers can exit before their child reads a file. Keep recent
+// prompts available, and expire old cache entries on the next review launch.
+func cleanupReviewPrompts(directory string, now time.Time) {
+	entries, err := os.ReadDir(directory)
+	if err != nil {
+		return
+	}
+	for _, entry := range entries {
+		if !strings.HasPrefix(entry.Name(), "prompt-") || !strings.HasSuffix(entry.Name(), ".txt") {
+			continue
+		}
+		info, err := entry.Info()
+		if err == nil && info.Mode().IsRegular() && now.Sub(info.ModTime()) > 30*24*time.Hour {
+			_ = os.Remove(filepath.Join(directory, entry.Name()))
+		}
+	}
 }

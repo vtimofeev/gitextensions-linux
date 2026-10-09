@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"fmt"
 	"gitextensions-linux/internal/gitclient"
 	"github.com/wailsapp/wails/v2/pkg/runtime"
 	"os"
@@ -19,9 +20,18 @@ func NewApp(path string) *App              { return &App{initialPath: path, git:
 func (a *App) startup(ctx context.Context) { a.ctx = ctx }
 func (a *App) InitialRepository() string   { return a.initialPath }
 func (a *App) ChooseRepository() (string, error) {
-	directory, _ := filepath.Abs(a.initialPath)
+	directory, err := filepath.Abs(a.initialPath)
+	if err != nil {
+		directory = ""
+	}
 	if info, err := os.Stat(directory); err != nil || !info.IsDir() {
-		directory, _ = os.Getwd()
+		directory, err = os.Getwd()
+		if err != nil {
+			directory, err = os.UserHomeDir()
+			if err != nil {
+				return "", fmt.Errorf("choose repository directory: %w", err)
+			}
+		}
 	}
 	return runtime.OpenDirectoryDialog(a.ctx, runtime.OpenDialogOptions{Title: "Choose Git repository", DefaultDirectory: directory, ShowHiddenFiles: true})
 }

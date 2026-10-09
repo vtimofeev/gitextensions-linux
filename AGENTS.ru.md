@@ -41,18 +41,3 @@ Git Extensions Linux — локальное desktop-приложение на Go
 
 - Основные документы вести на английском в `.md`, русские версии — рядом в `.ru.md`. Обновлять обе версии и ссылки вместе. Текст `LICENSE.md` не менять.
 
-<!-- BEGIN agent-harness -->
-# Global Agent Harness
-
-## Available agents
-
-- `ah-analyzer`: codebase analysis and measurements.
-- `ah-requirement-quality-lead`: requirements analysis and clarification.
-- `ah-fullstack-lead`: fullstack implementation across DevOps, Go, Vue, JS/TS and Node.js.
-- `ah-architect-contracts`: API, event and schema design.
-- `ah-architect-devops`, `ah-architect-go`, `ah-architect-js`, `ah-architect-python`, `ah-architect-vue3`: architecture and task preparation for their respective stacks.
-- `ah-implementer-devops`, `ah-implementer-go`, `ah-implementer-js`, `ah-implementer-python`, `ah-implementer-vue3`: implementation of prepared tasks for their respective stacks.
-- `ah-validator`: independent architecture, quality and readability review.
-
-These agents are available on explicit user request. Their rules are loaded with the selected role.
-<!-- END agent-harness -->
