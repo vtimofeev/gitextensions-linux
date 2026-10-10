@@ -1,6 +1,184 @@
 import { test, expect } from "@playwright/test";
 import { installBridge } from "./bridge";
 
+test("rapid file navigation debounces diffs, preserves list focus and rejects stale responses", async ({
+  page,
+}) => {
+  await installBridge(page);
+  await page.addInitScript(() => {
+    const w = window as any;
+    w.testSnapshot.files = ["first.ts", "second.ts", "third.ts"].map(
+      (path) => ({
+        path,
+        originalPath: "",
+        index: "M",
+        worktree: "M",
+        conflict: false,
+        untracked: false,
+      }),
+    );
+    w.pendingDiffs = {};
+    w.go.main.App.Diff = (...args: string[]) => {
+      w.testCalls.push({ name: "Diff", args });
+      return new Promise<string>((resolve) => {
+        w.pendingDiffs[args[2] + ":" + args[1]] = resolve;
+      });
+    };
+  });
+  await page.goto("/");
+  const unstaged = page.locator('.sidebar-files[data-area="unstaged"]');
+  const staged = page.locator('.sidebar-files[data-area="staged"]');
+  await expect(
+    unstaged.getByRole("button", { name: "first.ts", exact: true }),
+  ).toBeVisible();
+  const immediate = await unstaged.evaluate((el) => {
+    for (const name of ["first.ts", "second.ts", "third.ts"]) {
+      (
+        el.querySelector(`.file-button[title="${name}"]`) as HTMLButtonElement
+      ).click();
+    }
+    return (window as any).testCalls.filter((c: any) => c.name === "Diff");
+  });
+  expect(immediate).toEqual([]);
+  await expect(unstaged.locator(".file-row.selected .file-button")).toHaveText(
+    "third.ts",
+  );
+  await expect
+    .poll(() =>
+      page.evaluate(
+        () =>
+          (window as any).testCalls.filter((c: any) => c.name === "Diff")
+            .length,
+      ),
+    )
+    .toBe(1);
+  await staged.getByRole("button", { name: "first.ts", exact: true }).click();
+  await page.keyboard.press("ArrowDown");
+  await expect(
+    staged.getByRole("button", { name: "second.ts", exact: true }),
+  ).toBeFocused();
+  await expect
+    .poll(() =>
+      page.evaluate(
+        () =>
+          (window as any).testCalls.filter((c: any) => c.name === "Diff")
+            .length,
+      ),
+    )
+    .toBe(2);
+  await page.evaluate(() => {
+    (window as any).pendingDiffs["staged:second.ts"](
+      "@@ -1 +1 @@\n-old\n+export const latest = 42;\n",
+    );
+  });
+  await expect(page.locator(".diff-viewer .added")).toContainText(
+    "export const latest = 42;",
+  );
+  await expect(
+    page.locator(".diff-viewer .syntax-keyword").first(),
+  ).toBeVisible();
+  await page.evaluate(() => {
+    (window as any).pendingDiffs["unstaged:third.ts"](
+      "@@ -1 +1 @@\n-old\n+obsolete\n",
+    );
+  });
+  await expect(page.locator(".diff-panel .filename")).toHaveText("second.ts");
+  await expect(page.locator(".diff-viewer .added")).toContainText(
+    "export const latest = 42;",
+  );
+  const calls = await page.evaluate(() =>
+    (window as any).testCalls
+      .filter((c: any) => c.name === "Diff")
+      .map((c: any) => c.args.slice(1, 3)),
+  );
+  expect(calls).toEqual([
+    ["third.ts", "unstaged"],
+    ["second.ts", "staged"],
+  ]);
+});
+
+test("file rows show type and area-specific status icons with accessible labels", async ({
+  page,
+}) => {
+  await installBridge(page);
+  await page.addInitScript(() => {
+    (window as any).testSnapshot.files = [
+      {
+        path: "new.ts",
+        index: "?",
+        worktree: "?",
+        untracked: true,
+        conflict: false,
+      },
+      {
+        path: "conflict.png",
+        index: "U",
+        worktree: "U",
+        untracked: false,
+        conflict: true,
+      },
+      {
+        path: "deleted.pdf",
+        index: " ",
+        worktree: "D",
+        untracked: false,
+        conflict: false,
+      },
+      {
+        path: "added.md",
+        index: "A",
+        worktree: "M",
+        untracked: false,
+        conflict: false,
+      },
+    ].map((file) => ({ ...file, originalPath: "" }));
+  });
+  await page.goto("/");
+  const unstaged = page.locator('.sidebar-files[data-area="unstaged"]');
+  const staged = page.locator('.sidebar-files[data-area="staged"]');
+  await expect(
+    unstaged.getByRole("img", { name: "Untracked file", exact: true }),
+  ).toHaveAttribute("title", "Untracked file");
+  await expect(
+    unstaged
+      .locator(".file-row")
+      .filter({ hasText: "new.ts" })
+      .locator(".file-type-icon"),
+  ).toHaveClass(/pi-code/);
+  await expect(
+    unstaged.getByRole("img", { name: "Conflict", exact: true }).locator("i"),
+  ).toHaveClass(/pi-exclamation-triangle/);
+  await expect(
+    unstaged
+      .locator(".file-row")
+      .filter({ hasText: "conflict.png" })
+      .locator(".file-type-icon"),
+  ).toHaveClass(/pi-image/);
+  await expect(
+    unstaged
+      .getByRole("img", { name: "Deleted file", exact: true })
+      .locator("i"),
+  ).toHaveClass(/pi-minus-circle/);
+  await expect(
+    unstaged
+      .locator(".file-row")
+      .filter({ hasText: "deleted.pdf" })
+      .locator(".file-type-icon"),
+  ).toHaveClass(/pi-file-pdf/);
+  await expect(
+    staged.getByRole("img", { name: "Added file", exact: true }),
+  ).toBeVisible();
+  await expect(
+    unstaged.getByRole("img", { name: "Modified file", exact: true }),
+  ).toBeVisible();
+  expect(await unstaged.locator(".file-status").allTextContents()).toEqual([
+    "",
+    "",
+    "",
+    "",
+  ]);
+});
+
 test("large lists virtualize, navigate, select ranges and stage all", async ({
   page,
 }) => {

@@ -92,6 +92,70 @@ describe("repository workflow state", () => {
     expect(repo.diff).toBe("new diff");
     expect(repo.diffLoading).toBe(false);
   });
+  it("updates selection immediately and debounces diff requests to the last file and area", async () => {
+    const { api, repo } = fixture();
+    await repo.open("/repo");
+    api.diff = vi.fn().mockResolvedValue("latest diff");
+    vi.useFakeTimers();
+    try {
+      const first = repo.loadDiff("first", "unstaged", 120);
+      await vi.advanceTimersByTimeAsync(60);
+      const last = repo.loadDiff("last", "staged", 120);
+      expect(repo.selectedFile).toBe("last");
+      expect(repo.selectedArea).toBe("staged");
+      expect(repo.diffLoading).toBe(true);
+      expect(repo.busy).toBe(false);
+      await vi.advanceTimersByTimeAsync(119);
+      expect(api.diff).not.toHaveBeenCalled();
+      await vi.advanceTimersByTimeAsync(1);
+      await Promise.all([first, last]);
+      expect(api.diff).toHaveBeenCalledExactlyOnceWith(
+        "/repo",
+        "last",
+        "staged",
+        "",
+      );
+      expect(repo.diff).toBe("latest diff");
+      expect(repo.diffLoading).toBe(false);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+  it("cancels a pending diff when selection is cleared", async () => {
+    const { api, repo } = fixture();
+    await repo.open("/repo");
+    api.diff = vi.fn();
+    vi.useFakeTimers();
+    try {
+      const pending = repo.loadDiff("first", "untracked", 120);
+      repo.clearDiff();
+      await vi.runAllTimersAsync();
+      await pending;
+      expect(api.diff).not.toHaveBeenCalled();
+      expect(repo.selectedFile).toBe("");
+      expect(repo.diffLoading).toBe(false);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+  it("ignores a late diff error while reopening the same repository", async () => {
+    const { api, repo } = fixture();
+    await repo.open("/repo");
+    let reject!: (error: Error) => void;
+    api.diff = vi.fn().mockImplementation(
+      () =>
+        new Promise<string>((_resolve, fail) => {
+          reject = fail;
+        }),
+    );
+    const pending = repo.loadDiff("old", "unstaged");
+    await repo.open("/repo");
+    reject(new Error("stale error"));
+    await pending;
+    expect(repo.error).toBe("");
+    expect(repo.diff).toBe("");
+    expect(repo.diffLoading).toBe(false);
+  });
   it("stages only the new path of an indexed rename with additional edits", async () => {
     const { api, repo } = fixture();
     await repo.open("/repo");

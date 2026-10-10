@@ -45,9 +45,9 @@
               ><span class="line-number new-line">{{ row.newLine ?? "" }}</span
               ><code
                 ><span
-                  v-for="(token, part) in tokens[start + index] || [
-                    { text: row.text, className: '' },
-                  ]"
+                  v-for="(token, part) in tokens[
+                    start + index - tokenStart
+                  ] || [{ text: row.text, className: '' }]"
                   :key="part"
                   :class="token.className"
                   >{{ token.text }}</span
@@ -68,31 +68,46 @@ import { Component, Vue, Prop, Watch, toNative } from "vue-facing-decorator";
 import { markRaw } from "vue";
 import { DiffDocument, type DiffRow } from "../diff/document";
 import type { CodeToken } from "../domain/diff-syntax";
+import { DiffHighlighter } from "../domain/diff-highlighter";
+import "../theme/syntax.scss";
 import { container } from "../store/container";
 @Component
 class DiffViewer extends Vue {
   @Prop({ type: String, required: true }) value!: string;
   @Prop({ default: "" }) fileName!: string;
   tokens: CodeToken[][] = [];
+  tokenStart = 0;
   private syntaxGeneration = 0;
+  private highlightedGeneration = 0;
+  private highlighter = markRaw(new DiffHighlighter());
+  private highlightTimer: ReturnType<typeof setTimeout> | null = null;
   get syntaxConfiguration() {
     return [this.fileName, container.preferences.syntaxEnabled];
   }
   @Watch("value")
   @Watch("syntaxConfiguration")
-  async highlight() {
+  @Watch("plain")
+  highlight() {
     const token = ++this.syntaxGeneration;
+    if (this.highlightTimer !== null) clearTimeout(this.highlightTimer);
+    this.highlighter.cancel();
     this.tokens = [];
-    if (!container.preferences.syntaxEnabled) return;
-    // CodeMirror parsers load on first highlighted diff, keeping them out of the main bundle.
-    const [{ loadLanguage, largeFile }, { diffTokens }] = await Promise.all([
-      import("../domain/syntax"),
-      import("../domain/diff-syntax"),
-    ]);
-    if (token !== this.syntaxGeneration || largeFile(this.value)) return;
-    const language = await loadLanguage(this.fileName);
-    if (token === this.syntaxGeneration && language)
-      this.tokens = diffTokens(this.document.rows, language);
+    if (!container.preferences.syntaxEnabled || !this.value) return;
+    this.highlightTimer = setTimeout(async () => {
+      this.highlightTimer = null;
+      this.highlightedGeneration = token;
+      const range = await this.highlighter.highlight(
+        this.value,
+        this.fileName,
+        this.plain,
+        this.start,
+        this.end,
+      );
+      if (token === this.syntaxGeneration) {
+        this.tokenStart = range.start;
+        this.tokens = markRaw(range.tokens);
+      }
+    }, 80);
   }
   @Prop({ type: Boolean, default: false }) plain!: boolean;
   @Prop({ type: String, default: "" }) emptyMessage!: string;
@@ -112,10 +127,23 @@ class DiffViewer extends Vue {
     return Math.max(0, Math.floor(this.offset / this.rowHeight) - 5);
   }
   get visible() {
-    return this.document.rows.slice(
-      this.start,
-      this.start + Math.ceil(this.height / this.rowHeight) + 11,
-    );
+    return this.document.rows.slice(this.start, this.end);
+  }
+  get end() {
+    return this.start + Math.ceil(this.height / this.rowHeight) + 11;
+  }
+  get tokenWindow() {
+    return `${this.start}:${this.end}`;
+  }
+  @Watch("tokenWindow")
+  highlightWindow() {
+    const token = this.syntaxGeneration;
+    if (token !== this.highlightedGeneration) return;
+    this.highlighter.range(this.start, this.end, (range) => {
+      if (token !== this.syntaxGeneration || range.start !== this.start) return;
+      this.tokenStart = range.start;
+      this.tokens = markRaw(range.tokens);
+    });
   }
   mounted() {
     const viewport = this.$refs.viewport as HTMLElement;
@@ -130,9 +158,13 @@ class DiffViewer extends Vue {
   }
   beforeUnmount() {
     ++this.syntaxGeneration;
+    if (this.highlightTimer !== null) clearTimeout(this.highlightTimer);
+    this.highlighter.dispose();
     this.observer?.disconnect();
   }
   @Watch("value")
+  @Watch("fileName")
+  @Watch("plain")
   reset() {
     this.offset = 0;
     const viewport = this.$refs.viewport as HTMLElement;

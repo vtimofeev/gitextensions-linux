@@ -42,8 +42,16 @@ export class Repository {
       paths = this.selectedFiles.paths;
     const cached = selectedCache.get(paths);
     if (cached?.files === files) return cached.selected;
-    const membership = selectionSet(paths);
-    const selected = markRaw(files.filter((f) => membership.has(f.path)));
+    const lists = fileLists(this.snapshot?.files);
+    // Resolve small selections directly; keep list order for range/multi-selection.
+    const selected = markRaw(
+      paths.length <= 1
+        ? paths.flatMap((path) => {
+            const file = lists.maps[area].get(path);
+            return file ? [file] : [];
+          })
+        : files.filter((f) => selectionSet(paths).has(f.path)),
+    );
     selectedCache.set(paths, { files, selected });
     return selected;
   }
@@ -291,6 +299,19 @@ export class Repository {
   recent: RecentRepo[] = loadRecentRepos();
   repositoryExists: Record<string, boolean> = {};
   private selection = 0;
+  private diffDelay: {
+    timer: ReturnType<typeof setTimeout>;
+    finish: () => void;
+  } | null = null;
+  private cancelDiffDelay() {
+    if (!this.diffDelay) return;
+    clearTimeout(this.diffDelay.timer);
+    this.diffDelay.finish();
+    this.diffDelay = null;
+  }
+  fileStatus(path: string) {
+    return fileLists(this.snapshot?.files).all.get(path);
+  }
   constructor(
     private readonly api: GitApi,
     readonly preferences?: Pick<
@@ -791,6 +812,7 @@ export class Repository {
   }
   clearDiff() {
     this.selection++;
+    this.cancelDiffDelay();
     this.diffLoading = false;
     this.selectedFile = "";
     this.diff = "";
@@ -831,27 +853,40 @@ export class Repository {
       if (token === this.selection) this.error = String(e);
     }
   }
-  async loadDiff(file: string, area: DiffArea) {
+  async loadDiff(file: string, area: DiffArea, delayMs = 0) {
+    this.cancelDiffDelay();
     this.selectedFile = file;
     this.selectedArea = area;
     this.diffLoading = true;
     const token = ++this.selection;
     const path = this.path;
+    const epoch = this.repositoryEpoch;
+    const revision = this.selectedCommit?.hash ?? "";
+    const current = () =>
+      token === this.selection &&
+      path === this.path &&
+      epoch === this.repositoryEpoch;
+    if (delayMs > 0) {
+      await new Promise<void>((finish) => {
+        this.diffDelay = markRaw({
+          timer: setTimeout(finish, delayMs),
+          finish,
+        });
+      });
+      if (!current()) return;
+      this.diffDelay = null;
+    }
     try {
-      const diff = await this.api.diff(
-        path,
-        file,
-        area,
-        this.selectedCommit?.hash ?? "",
-      );
-      if (token === this.selection && path === this.path) this.diff = diff;
+      if (!current()) return;
+      const diff = await this.api.diff(path, file, area, revision);
+      if (current()) this.diff = diff;
     } catch (e) {
-      if (token === this.selection) {
+      if (current()) {
         this.diff = "";
         this.error = String(e);
       }
     } finally {
-      if (token === this.selection) this.diffLoading = false;
+      if (current()) this.diffLoading = false;
     }
   }
   showTab(tab: "history" | "changes") {
@@ -890,6 +925,7 @@ const listCache = new WeakMap<
     staged: FileStatus[];
     unstaged: FileStatus[];
     maps: Record<FileArea, Map<string, FileStatus>>;
+    all: Map<string, FileStatus>;
   }
 >();
 function fileLists(files = EMPTY_FILES) {
@@ -901,7 +937,9 @@ function fileLists(files = EMPTY_FILES) {
       staged: new Map<string, FileStatus>(),
       unstaged: new Map<string, FileStatus>(),
     };
+    const all = new Map<string, FileStatus>();
     for (const f of files) {
+      all.set(f.path, f);
       if (f.index !== " " && !f.untracked && !f.conflict) {
         staged.push(f);
         maps.staged.set(f.path, f);
@@ -911,7 +949,12 @@ function fileLists(files = EMPTY_FILES) {
         maps.unstaged.set(f.path, f);
       }
     }
-    cached = { staged: markRaw(staged), unstaged: markRaw(unstaged), maps };
+    cached = {
+      staged: markRaw(staged),
+      unstaged: markRaw(unstaged),
+      maps,
+      all,
+    };
     listCache.set(files, cached);
   }
   return cached;

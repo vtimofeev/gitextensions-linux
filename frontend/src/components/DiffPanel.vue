@@ -71,14 +71,15 @@
             @click="store.openConflict(store.selectedFile)"
           />
         </div>
-        <p v-else-if="store.diffLoading" class="empty">
-          {{ $t("diffLoading") }}
-        </p>
         <p v-else-if="!store.selectedFile" class="empty">
           {{ $t("selectFile") }}
         </p>
         <template v-else-if="imageFile && viewImage">
-          <p v-if="imageLoading" class="empty" role="status">
+          <p
+            v-if="store.diffLoading || imageLoading"
+            class="empty"
+            role="status"
+          >
             {{ $t("loading") }}
           </p>
           <p v-else-if="imageError" class="empty">{{ $t("previewFailed") }}</p>
@@ -89,13 +90,17 @@
           />
           <p v-else class="empty">{{ $t("previewFailed") }}</p>
         </template>
-        <DiffViewer
-          v-else
-          :key="store.selectedArea + ':' + store.selectedFile"
-          :value="store.diff"
-          :file-name="store.selectedFile"
-          :plain="store.selectedArea === 'untracked'"
-        />
+        <template v-else>
+          <p v-if="store.diffLoading" class="empty" role="status">
+            {{ $t("diffLoading") }}
+          </p>
+          <DiffViewer
+            v-show="!store.diffLoading"
+            :value="store.diffLoading ? '' : store.diff"
+            :file-name="store.selectedFile"
+            :plain="store.selectedArea === 'untracked'"
+          />
+        </template>
       </section>
     </div>
     <CommitDetails
@@ -240,9 +245,7 @@ class DiffPanel extends Vue {
     if (!target) return;
     if (
       target.area !== "commit" &&
-      this.store.snapshot?.files.some(
-        (f) => f.path === target.file && f.conflict,
-      )
+      this.store.fileStatus(target.file)?.conflict
     )
       this.store.openConflict(target.file);
     else this.store.openDiffTool(target.file, target.area);
@@ -250,9 +253,7 @@ class DiffPanel extends Vue {
   get selectedConflict() {
     return (
       this.store.selectedArea !== "commit" &&
-      this.store.snapshot?.files.some(
-        (f) => f.path === this.store.selectedFile && f.conflict,
-      )
+      this.store.fileStatus(this.store.selectedFile)?.conflict
     );
   }
   get store() {

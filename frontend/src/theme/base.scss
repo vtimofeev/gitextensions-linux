@@ -127,6 +127,33 @@ label.check {
   font: var(--font-size-code) var(--font-code);
   color: var(--color-positive);
 }
+.sidebar-files .file-status,
+.file-type-icon {
+  flex: 0 0 16px;
+  text-align: center;
+  font-size: var(--text-sm);
+}
+.file-type-icon {
+  color: var(--color-text-secondary);
+}
+.sidebar-files .file-status {
+  &.status-modified,
+  &.status-renamed,
+  &.status-copied {
+    color: var(--color-accent);
+  }
+  &.status-conflict,
+  &.status-deleted {
+    color: var(--color-negative);
+  }
+  &.status-untracked,
+  &.status-unchanged {
+    color: var(--color-text-secondary);
+  }
+  .pi {
+    font-size: inherit;
+  }
+}
 .selected {
   background: var(--color-selection);
   box-shadow: inset 3px 0 var(--color-accent);

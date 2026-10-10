@@ -97,15 +97,21 @@
               @dragstart="drag($event, file, area.key)"
               @contextmenu.prevent.stop="menu($event, file, area.key)"
             >
-              <span class="file-status">{{
-                file.conflict
-                  ? "!"
-                  : file.untracked
-                    ? "?"
-                    : area.key === "staged"
-                      ? file.index
-                      : file.worktree
-              }}</span>
+              <span
+                class="file-status"
+                :class="'status-' + statusIcon(file, area.key).tone"
+                role="img"
+                :aria-label="$t(statusIcon(file, area.key).label)"
+                :title="$t(statusIcon(file, area.key).label)"
+                ><i
+                  :class="['pi', statusIcon(file, area.key).icon]"
+                  aria-hidden="true"
+              /></span>
+              <i
+                class="file-type-icon pi"
+                :class="typeIcon(file.path)"
+                aria-hidden="true"
+              />
               <button
                 class="file-button"
                 :title="file.path"
@@ -286,9 +292,12 @@ import Button from "primevue/button";
 import Dialog from "primevue/dialog";
 import { container } from "../store/container";
 import type { FileStatus } from "../domain/models";
+import { fileTypeIcon, fileStatusIcon } from "../domain/file-icons";
 type Area = "staged" | "unstaged";
 @Component({ components: { CommitForm, Button, Dialog } })
 class SidebarChanges extends Vue {
+  typeIcon = fileTypeIcon;
+  statusIcon = fileStatusIcon;
   context: { file: FileStatus; area: Area; x: number; y: number } | null = null;
   discarding: { files: FileStatus[]; area: Area } | null = null;
   deleteNewFiles = false;
@@ -365,7 +374,11 @@ class SidebarChanges extends Vue {
     else this.store.selectFile(file.path, area);
     if (file.conflict) this.store.openConflict(file.path);
     else
-      void this.store.loadDiff(file.path, file.untracked ? "untracked" : area);
+      void this.store.loadDiff(
+        file.path,
+        file.untracked ? "untracked" : area,
+        120,
+      );
   }
   offsets: Record<Area, number> = { staged: 0, unstaged: 0 };
   heights: Record<Area, number> = { staged: 288, unstaged: 288 };

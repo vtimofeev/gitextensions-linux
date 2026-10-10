@@ -5,4 +5,5 @@ export default defineConfig({
   clearScreen: false,
   server: { host: "127.0.0.1" },
   build: { target: "es2020" },
+  worker: { format: "es" },
 });

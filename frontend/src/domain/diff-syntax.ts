@@ -5,7 +5,7 @@ import {
   type LanguageSupport,
 } from "@codemirror/language";
 import { highlightTree } from "@lezer/highlight";
-import { appHighlightStyle } from "../theme/code-theme";
+import { appHighlightStyle } from "../theme/syntax-style";
 import type { DiffRow } from "../diff/document";
 export interface CodeToken {
   text: string;

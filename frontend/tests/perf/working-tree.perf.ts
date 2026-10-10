@@ -2,6 +2,112 @@ import { writeFileSync } from "node:fs";
 import { test, expect, type Page } from "@playwright/test";
 import { installBridge } from "../e2e/bridge";
 
+test("file navigation with large highlighted diffs", async ({ page }) => {
+  test.setTimeout(180_000);
+  const cdp = await page.context().newCDPSession(page);
+  await cdp.send("Emulation.setCPUThrottlingRate", {
+    rate: Number(process.env.PERF_CPU_THROTTLE || 1),
+  });
+  await installBridge(page);
+  await page.addInitScript(() => {
+    const w = window as any;
+    w.testSnapshot.files = Array.from({ length: 35000 }, (_, i) => ({
+      path: `file-${i}.ts`,
+      originalPath: "",
+      index: "M",
+      worktree: "M",
+      untracked: false,
+      conflict: false,
+    }));
+    const lines = Array.from(
+      { length: 10000 },
+      (_, i) => `+export const value${i} = { name: "value", count: ${i} };`,
+    ).join("\n");
+    w.go.main.App.Diff = async (_path: string, file: string) =>
+      `@@ -0,0 +1,10001 @@\n+// ${file}\n${lines}\n`;
+    w.navigationTasks = [];
+    new PerformanceObserver((list) =>
+      w.navigationTasks.push(...list.getEntries().map((e) => e.duration)),
+    ).observe({ type: "longtask" });
+  });
+  await page.goto("/");
+  const button = page
+    .locator('.sidebar-files[data-area="unstaged"] .file-button')
+    .first();
+  await expect(button).toBeVisible();
+  await button.click();
+  await expect(
+    page.locator(".diff-viewer .syntax-keyword").first(),
+  ).toBeVisible({ timeout: 60_000 });
+  const result = await profile(page, "navigation", () =>
+    page.evaluate(async () => {
+      const w = window as any;
+      w.navigationTasks = [];
+      const frames: number[] = [];
+      for (const area of ["staged", "unstaged"]) {
+        for (let i = 1; i <= 5; i++) {
+          const started = performance.now();
+          (
+            document.querySelector(
+              `.sidebar-files[data-area="${area}"] [data-index="${i}"] .file-button`,
+            ) as HTMLButtonElement
+          ).click();
+          await new Promise((resolve) =>
+            requestAnimationFrame(() => requestAnimationFrame(resolve)),
+          );
+          frames.push(performance.now() - started);
+          await new Promise((resolve) => setTimeout(resolve, 100));
+        }
+      }
+      await new Promise((resolve) => setTimeout(resolve, 100));
+      frames.sort((a, b) => a - b);
+      return {
+        p50: frames[5],
+        max: frames.at(-1),
+        longTasks: w.navigationTasks.length,
+        longestTaskMs: Math.max(0, ...w.navigationTasks),
+      };
+    }),
+  );
+  console.log("PERF navigation " + JSON.stringify(result));
+  // Also measure completed previews so debounce cannot hide parsing costs.
+  await expect(
+    page.locator(".diff-viewer .syntax-keyword").first(),
+  ).toBeVisible({ timeout: 60_000 });
+  await page.evaluate(() => {
+    (window as any).navigationTasks = [];
+  });
+  for (const area of ["staged", "unstaged"]) {
+    await page
+      .locator(
+        `.sidebar-files[data-area="${area}"] [data-index="6"] .file-button`,
+      )
+      .click();
+    await expect(page.locator(".diff-panel .filename")).toHaveText("file-6.ts");
+    await expect(
+      page.locator(".diff-viewer .syntax-keyword").first(),
+    ).toBeVisible({ timeout: 60_000 });
+  }
+  const completed = await page.evaluate(() => ({
+    longTasks: (window as any).navigationTasks.length,
+    longestTaskMs: Math.max(0, ...(window as any).navigationTasks),
+  }));
+  console.log("PERF completed previews " + JSON.stringify(completed));
+  await page.locator(".diff-scroll").evaluate((el) => {
+    el.scrollTop = el.scrollHeight;
+  });
+  const lastLine = page
+    .locator(".diff-viewer .added")
+    .filter({ hasText: "value9999" });
+  await expect(lastLine).toBeVisible();
+  await expect(lastLine.locator(".syntax-keyword").first()).toHaveText(
+    "export",
+  );
+  expect(await page.locator(".diff-viewer .diff-line").count()).toBeLessThan(
+    100,
+  );
+});
+
 async function profile<T>(page: Page, name: string, action: () => Promise<T>) {
   if (!process.env.PERF_PROFILE) return action();
   const cdp = await page.context().newCDPSession(page);
