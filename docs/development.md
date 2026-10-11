@@ -3,7 +3,7 @@
 English | [Русский](development.ru.md)
 
 See [AGENTS.md](../AGENTS.md) for the project structure and change rules.
-Use Go 1.25+, Node.js LTS, npm and Wails 2.15.0. System dependencies are listed in [linux-install.md](linux-install.md).
+Use Go 1.25+, Node.js LTS, npm and Wails 2.15.0. System dependencies and build instructions: [Linux](linux-install.md), [macOS (Intel)](macos-install.md).
 
 ## Run and build
 

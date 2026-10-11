@@ -44,7 +44,7 @@ wails build
 ./build/bin/gitextensions-linux
 ```
 
-[Установка, сборка и перенос на другую машину](docs/linux-install.ru.md) · [Разработка и проверки](docs/development.ru.md) · [Настройка проверки кода](docs/code-review.ru.md)
+[Установка, сборка и перенос на Linux](docs/linux-install.ru.md) · [Сборка на macOS (Intel)](docs/macos-install.ru.md) · [Разработка и проверки](docs/development.ru.md) · [Настройка проверки кода](docs/code-review.ru.md)
 
 ## Управление
 

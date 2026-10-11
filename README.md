@@ -44,7 +44,7 @@ wails build
 ./build/bin/gitextensions-linux
 ```
 
-[Build and install](docs/linux-install.md) · [Development and checks](docs/development.md) · [Set up code review](docs/code-review.md)
+[Build and install on Linux](docs/linux-install.md) · [Build on macOS (Intel)](docs/macos-install.md) · [Development and checks](docs/development.md) · [Set up code review](docs/code-review.md)
 
 ## Shortcuts
 

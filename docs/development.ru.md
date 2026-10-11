@@ -3,7 +3,7 @@
 [English](development.md) | Русский
 
 Структура проекта и правила изменений: [AGENTS.ru.md](../AGENTS.ru.md).
-Используйте Go 1.25+, Node.js LTS, npm и Wails 2.15.0. Системные зависимости: [linux-install.md](linux-install.ru.md).
+Используйте Go 1.25+, Node.js LTS, npm и Wails 2.15.0. Системные зависимости и инструкции по сборке: [Linux](linux-install.ru.md), [macOS (Intel)](macos-install.ru.md).
 
 ## Запуск и сборка
 
