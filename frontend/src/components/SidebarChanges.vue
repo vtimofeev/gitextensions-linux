@@ -1,191 +1,240 @@
 <template>
   <section ref="pane" class="panel sidebar-changes">
     <CommitForm />
-    <section
-      v-for="area in areas"
-      :key="area.key"
-      @keydown.esc.stop="store.clearSelection()"
+    <Splitter
+      class="change-split"
+      :class="{ 'has-collapsed': collapsed.staged || collapsed.unstaged }"
+      layout="vertical"
+      state-key="gitextensions.staging.split"
+      state-storage="local"
+      :gutter-size="6"
+      :pt="{ gutterHandle: { 'aria-label': $t('resizeStaging') } }"
+      @resizestart="resizeStart"
     >
-      <div class="panel-heading">
-        <h3>
-          {{ $t(area.key) }} <span class="muted">{{ area.files.length }}</span>
-        </h3>
-        <div v-if="selected(area.key).length > 1" class="selection-actions">
-          <Button
-            :label="
-              $t(area.key === 'staged' ? 'unstage' : 'stage') +
-              ' ' +
-              selected(area.key).length
-            "
-            :title="
-              $t(area.key === 'staged' ? 'unstageFiles' : 'stageFiles', {
-                n: selected(area.key).length,
-              })
-            "
-            text
-            size="small"
-            :disabled="store.busy || !selections[area.key].movable"
-            @click="moveFiles(selected(area.key), area.key)"
-          />
-          <Button
-            :label="$t('revert') + ' ' + selected(area.key).length"
-            :title="$t('revertFiles', { n: selected(area.key).length })"
-            text
-            size="small"
-            :disabled="store.busy || selections[area.key].conflict"
-            @click="confirmFiles(selected(area.key), area.key)"
-          />
-        </div>
-        <Button
-          v-if="area.key === 'staged'"
-          class="review-button"
-          icon="pi pi-sparkles"
-          :aria-label="$t('reviewUncommitted')"
-          :title="$t('reviewUncommitted')"
-          text
-          size="small"
-          :disabled="store.busy"
-          @click="reviewChanges"
-        />
-        <Button
-          :label="$t(area.key === 'staged' ? 'unstageAll' : 'stageAll')"
-          size="small"
-          text
-          :disabled="
-            store.busy ||
-            !area.files.length ||
-            (area.key === 'unstaged' && !area.files.some((f) => !f.conflict))
-          "
-          @click="area.key === 'staged' ? store.unstage() : store.stage()"
-        />
-      </div>
-      <div
-        class="sidebar-files"
-        :data-area="area.key"
-        tabindex="0"
-        role="listbox"
-        aria-multiselectable="true"
-        :aria-label="$t(area.key)"
-        @keydown="listKey($event, area.key)"
-        @scroll="scroll($event, area.key)"
-        @dragover.prevent
-        @drop.prevent="drop($event, area.key)"
+      <SplitterPanel
+        v-for="area in areas"
+        :key="area.key"
+        :size="50"
+        :min-size="15"
+        :class="{ 'area-collapsed': collapsed[area.key] }"
       >
-        <div
-          class="files-spacer"
-          :style="{ height: `${area.files.length * rowHeight}px` }"
-        >
+        <section class="change-area" @keydown.esc.stop="store.clearSelection()">
+          <div class="panel-heading">
+            <h3>
+              <button
+                class="section-toggle"
+                :aria-expanded="!collapsed[area.key]"
+                :aria-label="
+                  $t(
+                    collapsed[area.key] ? 'expandSection' : 'collapseSection',
+                    { name: $t(area.key) },
+                  )
+                "
+                @click="toggleArea(area.key)"
+              >
+                <i
+                  :class="[
+                    'pi',
+                    collapsed[area.key]
+                      ? 'pi-chevron-right'
+                      : 'pi-chevron-down',
+                  ]"
+                  aria-hidden="true"
+                />{{ $t(area.key) }}
+                <span class="muted">{{ area.files.length }}</span>
+              </button>
+              <Button
+                v-if="area.key === 'staged'"
+                class="status-refresh"
+                icon="pi pi-refresh"
+                text
+                size="small"
+                :aria-label="$t('refreshStatus')"
+                :title="$t('refreshStatus')"
+                :disabled="store.busy"
+                :loading="store.busy && store.activity === 'activityRefresh'"
+                @click="store.refreshWorking()"
+              />
+            </h3>
+            <div v-if="selected(area.key).length > 1" class="selection-actions">
+              <Button
+                :label="
+                  $t(area.key === 'staged' ? 'unstage' : 'stage') +
+                  ' ' +
+                  selected(area.key).length
+                "
+                :title="
+                  $t(area.key === 'staged' ? 'unstageFiles' : 'stageFiles', {
+                    n: selected(area.key).length,
+                  })
+                "
+                text
+                size="small"
+                :disabled="store.busy || !selections[area.key].movable"
+                @click="moveFiles(selected(area.key), area.key)"
+              />
+              <Button
+                :label="$t('revert') + ' ' + selected(area.key).length"
+                :title="$t('revertFiles', { n: selected(area.key).length })"
+                text
+                size="small"
+                :disabled="store.busy || selections[area.key].conflict"
+                @click="confirmFiles(selected(area.key), area.key)"
+              />
+            </div>
+            <Button
+              v-if="area.key === 'staged'"
+              class="review-button"
+              icon="pi pi-sparkles"
+              :aria-label="$t('reviewUncommitted')"
+              :title="$t('reviewUncommitted')"
+              text
+              size="small"
+              :disabled="store.busy"
+              @click="reviewChanges"
+            />
+            <Button
+              :label="$t(area.key === 'staged' ? 'unstageAll' : 'stageAll')"
+              size="small"
+              text
+              :disabled="
+                store.busy ||
+                !area.files.length ||
+                (area.key === 'unstaged' &&
+                  !area.files.some((f) => !f.conflict))
+              "
+              @click="area.key === 'staged' ? store.unstage() : store.stage()"
+            />
+          </div>
           <div
-            class="files-window"
-            :style="{
-              transform: `translateY(${start(area.key) * rowHeight}px)`,
-            }"
+            v-show="!collapsed[area.key]"
+            class="sidebar-files"
+            :data-area="area.key"
+            tabindex="0"
+            role="listbox"
+            aria-multiselectable="true"
+            :aria-label="$t(area.key)"
+            @keydown="listKey($event, area.key)"
+            @scroll="scroll($event, area.key)"
+            @dragover.prevent
+            @drop.prevent="drop($event, area.key)"
           >
             <div
-              v-for="(file, index) in visible(area.key)"
-              :key="file.path"
-              class="file-row"
-              :data-index="start(area.key) + index"
-              :style="{ height: `${rowHeight}px` }"
-              :class="{ selected: store.isFileSelected(file.path, area.key) }"
-              role="option"
-              :aria-setsize="area.files.length"
-              :aria-posinset="start(area.key) + index + 1"
-              :aria-selected="store.isFileSelected(file.path, area.key)"
-              @click="select($event, file, area.key)"
-              :draggable="!store.busy && !file.conflict"
-              @dragstart="drag($event, file, area.key)"
-              @contextmenu.prevent.stop="menu($event, file, area.key)"
+              class="files-spacer"
+              :style="{ height: `${area.files.length * rowHeight}px` }"
             >
-              <span
-                class="file-status"
-                :class="'status-' + statusIcon(file, area.key).tone"
-                role="img"
-                :aria-label="$t(statusIcon(file, area.key).label)"
-                :title="$t(statusIcon(file, area.key).label)"
-                ><i
-                  :class="['pi', statusIcon(file, area.key).icon]"
-                  aria-hidden="true"
-              /></span>
-              <i
-                class="file-type-icon pi"
-                :class="typeIcon(file.path)"
-                aria-hidden="true"
-              />
-              <button
-                class="file-button"
-                :title="file.path"
-                @keydown.shift.f10.prevent.stop="menu($event, file, area.key)"
-              >
-                {{ file.path }}
-              </button>
               <div
-                class="row-actions"
-                :class="{ 'conflict-actions': file.conflict }"
-                @click.stop
+                class="files-window"
+                :style="{
+                  transform: `translateY(${start(area.key) * rowHeight}px)`,
+                }"
               >
-                <button
-                  type="button"
-                  class="row-action"
-                  v-if="!file.conflict"
-                  :aria-label="actionLabel('revert', file, area.key)"
-                  :title="actionLabel('revert', file, area.key)"
-                  :disabled="store.busy || hasConflict(file, area.key)"
-                  @click="confirmFiles(targets(file, area.key), area.key)"
-                >
-                  <i class="pi pi-undo" aria-hidden="true" />
-                </button>
-                <button
-                  type="button"
-                  class="row-action"
-                  :aria-label="
-                    actionLabel(
-                      file.conflict
-                        ? 'resolveConflict'
-                        : area.key === 'staged'
-                          ? 'unstage'
-                          : 'stage',
-                      file,
-                      area.key,
-                    )
-                  "
-                  :title="
-                    actionLabel(
-                      file.conflict
-                        ? 'resolveConflict'
-                        : area.key === 'staged'
-                          ? 'unstage'
-                          : 'stage',
-                      file,
-                      area.key,
-                    )
-                  "
-                  :disabled="store.busy"
-                  @click="
-                    file.conflict
-                      ? store.openConflict(file.path)
-                      : moveFiles(targets(file, area.key), area.key)
-                  "
+                <div
+                  v-for="(file, index) in visible(area.key)"
+                  :key="file.path"
+                  class="file-row"
+                  :data-index="start(area.key) + index"
+                  :style="{ height: `${rowHeight}px` }"
+                  :class="{
+                    selected: store.isFileSelected(file.path, area.key),
+                  }"
+                  role="option"
+                  :aria-setsize="area.files.length"
+                  :aria-posinset="start(area.key) + index + 1"
+                  :aria-selected="store.isFileSelected(file.path, area.key)"
+                  @click="select($event, file, area.key)"
+                  :draggable="!store.busy && !file.conflict"
+                  @dragstart="drag($event, file, area.key)"
+                  @contextmenu.prevent.stop="menu($event, file, area.key)"
                 >
                   <i
+                    class="file-type-icon pi"
                     :class="[
-                      'pi',
-                      file.conflict
-                        ? 'pi-external-link'
-                        : area.key === 'staged'
-                          ? 'pi-minus'
-                          : 'pi-plus',
+                      typeIcon(file.path),
+                      'status-' + statusIcon(file, area.key).tone,
                     ]"
-                    aria-hidden="true"
+                    role="img"
+                    :aria-label="$t(statusIcon(file, area.key).label)"
+                    :title="$t(statusIcon(file, area.key).label)"
                   />
-                </button>
+                  <button
+                    class="file-button"
+                    :title="file.path"
+                    @keydown.shift.f10.prevent.stop="
+                      menu($event, file, area.key)
+                    "
+                  >
+                    {{ file.path }}
+                  </button>
+                  <div
+                    class="row-actions"
+                    :class="{ 'conflict-actions': file.conflict }"
+                    @click.stop
+                  >
+                    <button
+                      type="button"
+                      class="row-action"
+                      v-if="!file.conflict"
+                      :aria-label="actionLabel('revert', file, area.key)"
+                      :title="actionLabel('revert', file, area.key)"
+                      :disabled="store.busy || hasConflict(file, area.key)"
+                      @click="confirmFiles(targets(file, area.key), area.key)"
+                    >
+                      <i class="pi pi-undo" aria-hidden="true" />
+                    </button>
+                    <button
+                      type="button"
+                      class="row-action"
+                      :aria-label="
+                        actionLabel(
+                          file.conflict
+                            ? 'resolveConflict'
+                            : area.key === 'staged'
+                              ? 'unstage'
+                              : 'stage',
+                          file,
+                          area.key,
+                        )
+                      "
+                      :title="
+                        actionLabel(
+                          file.conflict
+                            ? 'resolveConflict'
+                            : area.key === 'staged'
+                              ? 'unstage'
+                              : 'stage',
+                          file,
+                          area.key,
+                        )
+                      "
+                      :disabled="store.busy"
+                      @click="
+                        file.conflict
+                          ? store.openConflict(file.path)
+                          : moveFiles(targets(file, area.key), area.key)
+                      "
+                    >
+                      <i
+                        :class="[
+                          'pi',
+                          file.conflict
+                            ? 'pi-external-link'
+                            : area.key === 'staged'
+                              ? 'pi-minus'
+                              : 'pi-plus',
+                        ]"
+                        aria-hidden="true"
+                      />
+                    </button>
+                  </div>
+                </div>
               </div>
             </div>
+            <p v-if="!area.files.length" class="empty">{{ $t("noChanges") }}</p>
           </div>
-        </div>
-        <p v-if="!area.files.length" class="empty">{{ $t("noChanges") }}</p>
-      </div>
-    </section>
+        </section>
+      </SplitterPanel>
+    </Splitter>
   </section>
   <Teleport to="body"
     ><div
@@ -290,12 +339,33 @@ import { nextTick, markRaw } from "vue";
 import CommitForm from "./CommitForm.vue";
 import Button from "primevue/button";
 import Dialog from "primevue/dialog";
+import Splitter from "primevue/splitter";
+import SplitterPanel from "primevue/splitterpanel";
 import { container } from "../store/container";
 import type { FileStatus } from "../domain/models";
 import { fileTypeIcon, fileStatusIcon } from "../domain/file-icons";
 type Area = "staged" | "unstaged";
-@Component({ components: { CommitForm, Button, Dialog } })
+@Component({
+  components: { CommitForm, Button, Dialog, Splitter, SplitterPanel },
+})
 class SidebarChanges extends Vue {
+  collapsed: Record<Area, boolean> = {
+    staged:
+      localStorage.getItem("gitextensions.layout.stagedCollapsed") === "true",
+    unstaged:
+      localStorage.getItem("gitextensions.layout.unstagedCollapsed") === "true",
+  };
+  toggleArea(area: Area) {
+    this.collapsed[area] = !this.collapsed[area];
+    localStorage.setItem(
+      `gitextensions.layout.${area}Collapsed`,
+      String(this.collapsed[area]),
+    );
+  }
+  resizeStart(event: { originalEvent: Event }) {
+    event.originalEvent?.preventDefault();
+    window.getSelection()?.removeAllRanges();
+  }
   typeIcon = fileTypeIcon;
   statusIcon = fileStatusIcon;
   context: { file: FileStatus; area: Area; x: number; y: number } | null = null;
@@ -415,6 +485,25 @@ class SidebarChanges extends Vue {
   }
   scroll(event: Event, area: Area) {
     this.offsets[area] = (event.target as HTMLElement).scrollTop;
+  }
+  get previewSelection() {
+    return [this.store.selectedArea, this.store.selectedFile];
+  }
+  @Watch("previewSelection")
+  revealPreview() {
+    if (this.store.selectedArea === "commit" || !this.$refs.pane) return;
+    const area = this.store.selectedArea === "staged" ? "staged" : "unstaged";
+    const list = this.list(area);
+    if (!list.clientHeight) return;
+    const index = this.store
+      .filesIn(area)
+      .findIndex((file) => file.path === this.store.selectedFile);
+    if (index < 0) return;
+    const top = index * this.rowHeight;
+    if (top < list.scrollTop) list.scrollTop = top;
+    else if (top + this.rowHeight > list.scrollTop + list.clientHeight)
+      list.scrollTop = top + this.rowHeight - list.clientHeight;
+    this.offsets[area] = list.scrollTop;
   }
   @Watch("fontSize")
   fontChanged(value: number, old: number) {
@@ -645,12 +734,6 @@ export default toNative(SidebarChanges);
   display: flex;
   flex-direction: column;
   min-height: 0;
-  > section {
-    flex: 1 1 0;
-    min-height: calc(var(--font-size-base) * 70 / 13);
-    display: flex;
-    flex-direction: column;
-  }
 }
 .sidebar-files {
   flex: 1 1 auto;
@@ -662,17 +745,17 @@ export default toNative(SidebarChanges);
   gap: 2px;
   padding: 3px 6px;
   h3 {
-    font-size: calc(var(--font-size-base) * 12 / 13);
+    font-size: calc(var(--font-size-base) * 11 / 13);
   }
 }
 .file-row {
   gap: 4px;
   padding: 0 5px;
-  font-size: calc(var(--font-size-base) * 12 / 13);
+  font-size: calc(var(--font-size-base) * 11 / 13);
 }
 .empty {
   padding: 6px;
-  font-size: calc(var(--font-size-base) * 12 / 13);
+  font-size: calc(var(--font-size-base) * 11 / 13);
 }
 .selection-actions {
   display: flex;
@@ -733,5 +816,56 @@ export default toNative(SidebarChanges);
 }
 .sidebar-files {
   overscroll-behavior: contain;
+}
+</style>
+
+<style lang="scss" scoped>
+.change-split {
+  flex: 1;
+  min-height: 0;
+  width: 100%;
+}
+.change-area {
+  height: 100%;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+.change-split.has-collapsed > :deep(.p-splitter-gutter) {
+  display: none;
+}
+.change-split.has-collapsed > :deep(.p-splitterpanel:not(.area-collapsed)) {
+  flex: 1 1 0 !important;
+}
+.change-split > :deep(.area-collapsed) {
+  flex: 0 0 auto !important;
+}
+.area-collapsed .change-area {
+  height: auto;
+}
+.file-row .file-button {
+  font-family: var(--font-sans);
+  font-size: inherit;
+  color: var(--color-text-secondary);
+}
+.file-row:hover .file-button,
+.file-row.selected .file-button {
+  color: var(--color-text);
+}
+.file-type-icon {
+  font-size: calc(var(--font-size-base) * 11 / 13);
+  opacity: 0.8;
+}
+</style>
+
+<style lang="scss" scoped>
+.panel-heading > h3 {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+}
+.status-refresh {
+  width: calc(var(--font-size-base) * 22 / 13);
+  height: calc(var(--font-size-base) * 22 / 13);
 }
 </style>

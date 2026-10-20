@@ -29,6 +29,23 @@
       >
       <span v-if="!changePositions.length">{{ $t("noRevisionChanges") }}</span>
     </div>
+    <div v-if="blame.length" class="change-actions blame-options">
+      <label
+        ><input
+          type="checkbox"
+          v-model="preferences.blame.showDate"
+          @change="saveBlameOption('showDate')"
+        />{{ $t("showDate") }}</label
+      >
+      <label
+        ><input
+          type="checkbox"
+          v-model="preferences.blame.showTime"
+          :disabled="!preferences.blame.showDate"
+          @change="saveBlameOption('showTime')"
+        />{{ $t("showTime") }}</label
+      >
+    </div>
     <div ref="editor" class="code-editor" />
   </div>
 </template>
@@ -90,7 +107,14 @@ class BlameMarker extends GutterMarker {
       settings = p.blame,
       line = this.line;
     const button = document.createElement("button");
-    button.className = "blame-gutter" + (this.alternate ? " alternate" : "");
+    button.className =
+      "blame-gutter" +
+      (this.alternate ? " alternate" : "") +
+      (!settings.showDate
+        ? " date-hidden"
+        : !settings.showTime
+          ? " time-hidden"
+          : "");
     button.style.borderLeftColor = authorColor(line.email || line.author);
     button.title = `${container.i18n.date(line.date)} · ${line.summary} · ${line.author} <${line.email}> · ${line.hash}`;
     button.setAttribute("aria-label", button.title);
@@ -312,6 +336,12 @@ class CodeViewer extends Vue {
       );
     return result;
   }
+  saveBlameOption(key: "showDate" | "showTime") {
+    localStorage.setItem(
+      `gitextensions.blame.${key}`,
+      String(this.preferences.blame[key]),
+    );
+  }
   viewerKey(event: KeyboardEvent) {
     if (event.defaultPrevented) event.stopPropagation();
   }
@@ -517,6 +547,12 @@ export default toNative(CodeViewer);
       var(--color-level-100)
     );
   }
+}
+.blame-gutter.date-hidden {
+  width: calc(var(--font-size-base) * 190 / 13);
+}
+.blame-gutter.time-hidden {
+  width: calc(var(--font-size-base) * 230 / 13);
 }
 .blame-info {
   display: flex;

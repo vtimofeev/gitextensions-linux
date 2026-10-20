@@ -17,6 +17,7 @@ it("strips metadata and counts old/new lines across hunks", () => {
     ["removed", 20, null, "last"],
     ["added", null, 21, "replacement"],
   ]);
+  expect(doc.changes).toEqual([2, 7]);
   expect(doc.rows.at(-1)?.noNewline).toBe(true);
   expect(doc.rows.some((r) => r.text.startsWith("diff --git"))).toBe(false);
 });
@@ -31,6 +32,7 @@ it("preserves plaintext prefixes and markup in untracked previews", () => {
     "<script>alert(1)</script>",
   ]);
   expect(doc.rows.map((r) => r.newLine)).toEqual([1, 2, 3]);
+  expect(doc.changes).toEqual([0]);
 });
 it("handles additions, deleted files, empty previews and binary summaries", () => {
   expect(

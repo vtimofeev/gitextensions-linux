@@ -7,7 +7,7 @@
     @update:visible="close"
   >
     <div v-if="target" class="inspection" @keydown="changeKey">
-      <div class="actions">
+      <div class="actions inspection-tabs">
         <Button
           :label="$t('wholeFile')"
           :severity="mode === 'file' ? 'primary' : 'secondary'"
@@ -605,5 +605,21 @@ export default toNative(FileInspection);
   flex-shrink: 0;
   padding: 6px;
   border-bottom: 1px solid var(--color-border);
+}
+</style>
+
+<style lang="scss" scoped>
+.inspection-tabs {
+  flex-wrap: nowrap;
+}
+.inspection-tabs > :deep(.p-button) {
+  flex: 0 0 auto;
+}
+.inspection-tabs > code {
+  margin-left: auto;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  min-width: 0;
 }
 </style>

@@ -1,7 +1,23 @@
 <template>
-  <aside class="panel branches">
+  <aside class="panel branches" :class="{ collapsed }">
     <div class="panel-heading">
-      <h2>{{ $t("branches") }}</h2>
+      <h2>
+        <button
+          class="section-toggle"
+          :aria-expanded="!collapsed"
+          :aria-label="
+            $t(collapsed ? 'expandSection' : 'collapseSection', {
+              name: $t('branches'),
+            })
+          "
+          @click="$emit('toggle')"
+        >
+          <i
+            :class="['pi', collapsed ? 'pi-chevron-right' : 'pi-chevron-down']"
+            aria-hidden="true"
+          />{{ $t("branches") }}
+        </button>
+      </h2>
       <Button
         icon="pi pi-plus"
         size="small"
@@ -11,7 +27,7 @@
         @click="requestCreate"
       />
     </div>
-    <div class="branch-search">
+    <div v-show="!collapsed" class="branch-search">
       <input
         v-model="search"
         type="search"
@@ -21,6 +37,7 @@
       />
     </div>
     <div
+      v-show="!collapsed"
       ref="viewport"
       class="branch-list"
       tabindex="0"
@@ -178,14 +195,15 @@
   </aside>
 </template>
 <script lang="ts">
-import { Component, Vue, Watch, toNative } from "vue-facing-decorator";
+import { Component, Vue, Prop, Watch, toNative } from "vue-facing-decorator";
 import { markRaw, nextTick } from "vue";
 import Button from "primevue/button";
 import Dialog from "primevue/dialog";
 import type { Branch } from "../domain/models";
 import { container } from "../store/container";
-@Component({ components: { Button, Dialog } })
+@Component({ components: { Button, Dialog }, emits: ["toggle"] })
 class BranchSidebar extends Vue {
+  @Prop({ default: false }) readonly collapsed!: boolean;
   @Watch("store.createBranchRequested")
   requestCreate() {
     this.switchNew = true;
@@ -394,6 +412,9 @@ export default toNative(BranchSidebar);
   > .branch-search {
     flex-shrink: 0;
   }
+}
+.branches.collapsed {
+  height: auto;
 }
 .branch-list {
   flex: 1;

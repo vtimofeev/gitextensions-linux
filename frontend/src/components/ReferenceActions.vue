@@ -408,7 +408,17 @@ class ReferenceActions extends Vue {
       : [];
   }
   itemLabel(item: RefMenuItem) {
-    const label = container.i18n.t(item.label);
+    const branchMenu = ["local", "remote"].includes(
+      this.store.refMenu?.target.kind ?? "",
+    );
+    const label =
+      item.action === "merge" && branchMenu
+        ? container.i18n.t("mergeIntoBranch", {
+            branch: this.store.snapshot?.detached
+              ? "HEAD"
+              : this.store.snapshot?.branch || "HEAD",
+          })
+        : container.i18n.t(item.label);
     return `${item.target.current && !item.children && item.action === "checkout" ? "✓ " : ""}${label}${item.name ? ` "${item.name}"` : ""}`;
   }
   hoverItem(event: MouseEvent, item: RefMenuItem) {

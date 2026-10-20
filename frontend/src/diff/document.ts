@@ -11,6 +11,7 @@ export interface DiffRow {
 // Parses Git's unified patch into presentation data without exposing metadata as code.
 export class DiffDocument {
   readonly rows: DiffRow[] = [];
+  readonly changes: number[] = [];
   maxColumns = 0;
   constructor(value: string, plain = false) {
     const lines = value.split("\n");
@@ -109,6 +110,13 @@ export class DiffDocument {
     }
   }
   private add(row: DiffRow) {
+    const previous = this.rows.at(-1)?.kind;
+    if (
+      (row.kind === "added" || row.kind === "removed") &&
+      previous !== "added" &&
+      previous !== "removed"
+    )
+      this.changes.push(this.rows.length);
     this.rows.push(row);
     this.maxColumns = Math.max(this.maxColumns, row.text.length);
   }
@@ -127,5 +135,15 @@ export class WholeFileDocument extends DiffDocument {
         this.rows[count++] = row;
     }
     this.rows.length = count;
+    this.changes.length = 0;
+    this.rows.forEach((row, index) => {
+      const previous = this.rows[index - 1]?.kind;
+      if (
+        (row.kind === "added" || row.kind === "removed") &&
+        previous !== "added" &&
+        previous !== "removed"
+      )
+        this.changes.push(index);
+    });
   }
 }

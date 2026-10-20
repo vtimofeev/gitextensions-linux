@@ -357,7 +357,12 @@ export class Repository {
   async bootstrap() {
     try {
       const path = await this.api.initialRepository();
-      if (path) await this.open(path);
+      const last =
+        localStorage.getItem("gitextensions.lastRepository") ||
+        [...this.recent].sort(
+          (a, b) => Date.parse(b.lastOpened) - Date.parse(a.lastOpened),
+        )[0]?.path;
+      if (path || last) await this.open(path || last!);
     } catch (e) {
       this.error = String(e);
     }
@@ -463,6 +468,7 @@ export class Repository {
         },
         ...this.recent.filter((repo) => repo.path !== snapshot.path),
       ];
+      localStorage.setItem("gitextensions.lastRepository", snapshot.path);
       this.repositoryExists[snapshot.path] = true;
       this.trimRecent();
     } catch (e) {
@@ -471,6 +477,14 @@ export class Repository {
       this.busy = false;
       this.activity = "";
     }
+  }
+  async refreshWorking() {
+    await this.execute(
+      () => Promise.resolve(""),
+      false,
+      "working",
+      "activityRefresh",
+    );
   }
   async refresh() {
     await this.execute(

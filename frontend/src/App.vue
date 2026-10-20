@@ -63,6 +63,7 @@
           :class="{ collapsed: sidebarCollapsed }"
           ><Splitter
             class="sidebar-split"
+            :class="{ 'branches-collapsed': branchesCollapsed }"
             layout="vertical"
             state-key="gitextensions.sidebar"
             state-storage="local"
@@ -75,6 +76,8 @@
             /></SplitterPanel>
             <SplitterPanel :size="40" :min-size="10" class="sidebar-pane"
               ><BranchSidebar
+                :collapsed="branchesCollapsed"
+                @toggle="toggleBranches"
             /></SplitterPanel> </Splitter
         ></SplitterPanel>
         <SplitterPanel :size="77" :min-size="35" class="main-column">
@@ -207,6 +210,15 @@ import { container } from "./store/container";
   },
 })
 class App extends Vue {
+  branchesCollapsed =
+    localStorage.getItem("gitextensions.layout.branchesCollapsed") === "true";
+  toggleBranches() {
+    this.branchesCollapsed = !this.branchesCollapsed;
+    localStorage.setItem(
+      "gitextensions.layout.branchesCollapsed",
+      String(this.branchesCollapsed),
+    );
+  }
   sidebarWidth = 300;
   sidebarCollapsed =
     localStorage.getItem("gitextensions.layout.sidebarCollapsed") === "true";
@@ -628,11 +640,8 @@ footer {
   width: 100%;
 }
 .sidebar-pane {
-  overflow: auto;
-  /* The changes pane scrolls inside its own lists. */
-  &:first-child {
-    overflow: hidden;
-  }
+  /* Each list owns its scrolling; the splitter panel only constrains its size. */
+  overflow: hidden;
 }
 </style>
 
@@ -665,5 +674,18 @@ footer > span:last-child {
   font-family: var(--font-code);
   font-size: calc(var(--font-size-code) * 0.85);
   line-height: 1;
+}
+</style>
+
+<style lang="scss" scoped>
+.sidebar-split.branches-collapsed > :deep(.sidebar-pane:first-child) {
+  flex: 1 1 0 !important;
+}
+.sidebar-split.branches-collapsed > :deep(.sidebar-pane:last-child) {
+  flex: 0 0 auto !important;
+  overflow: hidden;
+}
+.sidebar-split.branches-collapsed > :deep(.p-splitter-gutter) {
+  display: none;
 }
 </style>

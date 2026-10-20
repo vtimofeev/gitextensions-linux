@@ -3,6 +3,7 @@ export interface RefLabel {
   name: string;
   kind: "local" | "remote" | "tag" | "head" | "other";
   current: boolean;
+  remotes?: string[];
 }
 
 // Ref colors follow Git Extensions' GetHeadColor; current means the checked-out branch.
@@ -55,6 +56,35 @@ export class RefLabels {
         labels.push({ name, kind: "head", current: false });
       else if (name) labels.push({ name, kind: "other", current: false });
     }
-    return labels.sort((a, b) => Number(b.current) - Number(a.current));
+    // A tracking ref shares a badge only while both tips point at this commit.
+    const combined = new Map<RefLabel, string[]>();
+    const consumed = new Set<RefLabel>();
+    const locals = new Map(
+      branches
+        .filter((branch) => !branch.remote)
+        .map((branch) => [branch.name, branch]),
+    );
+    const remotes = new Map(
+      labels
+        .filter((label) => label.kind === "remote")
+        .map((label) => [label.name, label]),
+    );
+    for (const local of labels.filter((label) => label.kind === "local")) {
+      const upstream =
+        locals.get(local.name)?.upstream || `origin/${local.name}`;
+      const remote = remotes.get(upstream);
+      if (remote && !consumed.has(remote)) {
+        combined.set(local, [remote.name]);
+        consumed.add(remote);
+      }
+    }
+    return labels
+      .filter((label) => !consumed.has(label))
+      .map((label) =>
+        combined.has(label)
+          ? { ...label, remotes: combined.get(label)! }
+          : label,
+      )
+      .sort((a, b) => Number(b.current) - Number(a.current));
   }
 }

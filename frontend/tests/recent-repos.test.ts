@@ -135,7 +135,16 @@ describe("recent repositories", () => {
       "/other",
       "/recent",
     ]);
+    expect(localStorage.getItem("gitextensions.lastRepository")).toBe("/other");
     await repo.open("/favorite");
+    expect(localStorage.getItem("gitextensions.lastRepository")).toBe(
+      "/favorite",
+    );
+    api.snapshot = vi.fn().mockRejectedValue(new Error("Repository not found"));
+    await repo.open("/missing");
+    expect(localStorage.getItem("gitextensions.lastRepository")).toBe(
+      "/favorite",
+    );
     expect(repo.recent[0]).toEqual({
       path: "/favorite",
       favorite: true,
@@ -157,5 +166,43 @@ describe("recent repositories", () => {
     prefs.recentRepoLimit = 5;
     prefs.restore(saved);
     expect(prefs.recentRepoLimit).toBe(50);
+  });
+});
+
+describe("startup repository", () => {
+  it("opens the last active path when no repository was supplied", async () => {
+    localStorage.setItem("gitextensions.lastRepository", "/last");
+    const api = new GitApi();
+    api.initialRepository = vi.fn().mockResolvedValue("");
+    const repo = new Repository(api);
+    const open = vi.spyOn(repo, "open").mockResolvedValue();
+    await repo.bootstrap();
+    expect(open).toHaveBeenCalledWith("/last");
+  });
+  it("gives an explicit launch path priority over the saved repository", async () => {
+    localStorage.setItem("gitextensions.lastRepository", "/last");
+    const api = new GitApi();
+    api.initialRepository = vi.fn().mockResolvedValue("/explicit");
+    const repo = new Repository(api);
+    const open = vi.spyOn(repo, "open").mockResolvedValue();
+    await repo.bootstrap();
+    expect(open).toHaveBeenCalledWith("/explicit");
+  });
+  it("migrates recent history by time rather than favorite ordering", async () => {
+    seed([entry("/favorite", 10, true), entry("/latest", 1)]);
+    const api = new GitApi();
+    api.initialRepository = vi.fn().mockResolvedValue("");
+    const repo = new Repository(api);
+    const open = vi.spyOn(repo, "open").mockResolvedValue();
+    await repo.bootstrap();
+    expect(open).toHaveBeenCalledWith("/latest");
+  });
+  it("keeps the welcome screen when there is no saved repository", async () => {
+    const api = new GitApi();
+    api.initialRepository = vi.fn().mockResolvedValue("");
+    const repo = new Repository(api);
+    const open = vi.spyOn(repo, "open").mockResolvedValue();
+    await repo.bootstrap();
+    expect(open).not.toHaveBeenCalled();
   });
 });

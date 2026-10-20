@@ -111,7 +111,7 @@ export class GraphRenderer {
       ctx.stroke();
       if (row.hash === pointers.head) {
         ctx.strokeStyle = headColor;
-        ctx.lineWidth = 2.5;
+        ctx.lineWidth = 1;
         ctx.beginPath();
         ctx.arc(x(row.lane), y, 8, 0, Math.PI * 2);
         ctx.stroke();

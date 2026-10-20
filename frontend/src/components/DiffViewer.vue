@@ -1,5 +1,35 @@
 <template>
-  <div class="diff-viewer" :style="{ '--diff-row-height': rowHeight + 'px' }">
+  <div
+    class="diff-viewer"
+    :style="{ '--diff-row-height': rowHeight + 'px' }"
+    @keydown="navigateChanges"
+  >
+    <div v-if="document.changes.length" class="diff-navigation">
+      <Button
+        icon="pi pi-arrow-up"
+        text
+        size="small"
+        :aria-label="$t('previousChange')"
+        :title="$t('previousChange') + ' (Shift+F7)'"
+        aria-keyshortcuts="Shift+F7"
+        :disabled="change <= 0"
+        @click="jump(-1)"
+      />
+      <Button
+        icon="pi pi-arrow-down"
+        text
+        size="small"
+        :aria-label="$t('nextChange')"
+        :title="$t('nextChange') + ' (F7)'"
+        aria-keyshortcuts="F7"
+        :disabled="change >= document.changes.length - 1"
+        @click="jump(1)"
+      />
+      <span class="muted"
+        >{{ change < 0 ? "–" : change + 1 }} /
+        {{ document.changes.length }}</span
+      >
+    </div>
     <div class="diff-columns">
       <span>{{ $t("beforeLines") }}</span
       ><span>{{ $t("afterLines") }}</span
@@ -28,7 +58,10 @@
             v-for="(row, index) in visible"
             :key="start + index"
             class="diff-line"
-            :class="row.kind"
+            :class="[
+              row.kind,
+              { 'active-change': start + index === document.changes[change] },
+            ]"
             :data-row="start + index"
           >
             <template v-if="row.kind === 'hunk'"
@@ -66,12 +99,13 @@
 <script lang="ts">
 import { Component, Vue, Prop, Watch, toNative } from "vue-facing-decorator";
 import { markRaw } from "vue";
+import Button from "primevue/button";
 import { DiffDocument, type DiffRow } from "../diff/document";
 import type { CodeToken } from "../domain/diff-syntax";
 import { DiffHighlighter } from "../domain/diff-highlighter";
 import "../theme/syntax.scss";
 import { container } from "../store/container";
-@Component
+@Component({ components: { Button } })
 class DiffViewer extends Vue {
   @Prop({ type: String, required: true }) value!: string;
   @Prop({ default: "" }) fileName!: string;
@@ -111,6 +145,28 @@ class DiffViewer extends Vue {
   }
   @Prop({ type: Boolean, default: false }) plain!: boolean;
   @Prop({ type: String, default: "" }) emptyMessage!: string;
+  change = -1;
+  jump(direction: number) {
+    const changes = this.document.changes;
+    if (!changes.length) return;
+    this.change = Math.max(
+      0,
+      Math.min(changes.length - 1, this.change + direction),
+    );
+    const viewport = this.$refs.viewport as HTMLElement;
+    viewport.scrollTop = Math.max(
+      0,
+      changes[this.change]! * this.rowHeight - this.rowHeight,
+    );
+    this.offset = viewport.scrollTop;
+  }
+  navigateChanges(event: KeyboardEvent) {
+    if (event.key !== "F7" || event.altKey || event.ctrlKey || event.metaKey)
+      return;
+    event.preventDefault();
+    event.stopPropagation();
+    this.jump(event.shiftKey ? -1 : 1);
+  }
   offset = 0;
   height = 320;
   get rowHeight() {
@@ -166,6 +222,7 @@ class DiffViewer extends Vue {
   @Watch("fileName")
   @Watch("plain")
   reset() {
+    this.change = -1;
     this.offset = 0;
     const viewport = this.$refs.viewport as HTMLElement;
     if (viewport) {
@@ -275,5 +332,24 @@ export default toNative(DiffViewer);
   &.hunk {
     background: var(--color-surface-subtle);
   }
+}
+</style>
+
+<style lang="scss" scoped>
+.diff-navigation {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  flex-shrink: 0;
+  padding: 0 6px;
+  border-bottom: 1px solid var(--color-border);
+  font-size: var(--text-xs);
+}
+.diff-navigation > :deep(.p-button) {
+  width: calc(var(--font-size-base) * 22 / 13);
+  height: calc(var(--font-size-base) * 22 / 13);
+}
+.diff-line.active-change {
+  box-shadow: inset 3px 0 var(--color-accent);
 }
 </style>

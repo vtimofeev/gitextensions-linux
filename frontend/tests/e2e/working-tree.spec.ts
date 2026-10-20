@@ -97,7 +97,7 @@ test("rapid file navigation debounces diffs, preserves list focus and rejects st
   ]);
 });
 
-test("file rows show type and area-specific status icons with accessible labels", async ({
+test("file rows show one type icon with accessible area-specific status", async ({
   page,
 }) => {
   await installBridge(page);
@@ -146,8 +146,8 @@ test("file rows show type and area-specific status icons with accessible labels"
       .locator(".file-type-icon"),
   ).toHaveClass(/pi-code/);
   await expect(
-    unstaged.getByRole("img", { name: "Conflict", exact: true }).locator("i"),
-  ).toHaveClass(/pi-exclamation-triangle/);
+    unstaged.getByRole("img", { name: "Conflict", exact: true }),
+  ).toHaveClass(/pi-image/);
   await expect(
     unstaged
       .locator(".file-row")
@@ -155,10 +155,8 @@ test("file rows show type and area-specific status icons with accessible labels"
       .locator(".file-type-icon"),
   ).toHaveClass(/pi-image/);
   await expect(
-    unstaged
-      .getByRole("img", { name: "Deleted file", exact: true })
-      .locator("i"),
-  ).toHaveClass(/pi-minus-circle/);
+    unstaged.getByRole("img", { name: "Deleted file", exact: true }),
+  ).toHaveClass(/pi-file-pdf/);
   await expect(
     unstaged
       .locator(".file-row")
@@ -171,7 +169,8 @@ test("file rows show type and area-specific status icons with accessible labels"
   await expect(
     unstaged.getByRole("img", { name: "Modified file", exact: true }),
   ).toBeVisible();
-  expect(await unstaged.locator(".file-status").allTextContents()).toEqual([
+  await expect(unstaged.locator(".file-row > i")).toHaveCount(4);
+  expect(await unstaged.locator(".file-type-icon").allTextContents()).toEqual([
     "",
     "",
     "",

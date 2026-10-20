@@ -341,7 +341,9 @@ test("branch click opens menu with merge and rebase options", async ({
     .getByTitle("Checkout: feature", { exact: true })
     .click({ button: "right" });
   await expect(page.getByRole("menu")).toBeVisible();
-  await page.getByRole("menuitem", { name: "Merge", exact: true }).click();
+  await page
+    .getByRole("menuitem", { name: "Merge into main", exact: true })
+    .click();
   const dialog = page.getByRole("dialog");
   await dialog.getByLabel("Merge mode", { exact: true }).selectOption("no-ff");
   await dialog.getByLabel("Apply without committing", { exact: true }).check();
@@ -430,7 +432,9 @@ test("commit context actions, errors and operation recovery", async ({
   await page
     .getByTitle("Checkout: feature", { exact: true })
     .click({ button: "right" });
-  await page.getByRole("menuitem", { name: "Merge", exact: true }).click();
+  await page
+    .getByRole("menuitem", { name: "Merge into main", exact: true })
+    .click();
   await dialog.getByRole("button", { name: "Merge", exact: true }).click();
   await expect(
     page.locator("#error-notifications").getByRole("alert"),
@@ -820,11 +824,11 @@ test("file menus pass the correct versions to the external tool", async ({
     .click();
   const staged = page.locator('[data-area="staged"]');
   await expect(staged.locator(".file-row")).toHaveCount(1);
-  expect(
-    await staged.evaluate(
-      (el) => el.parentElement!.previousElementSibling?.textContent,
-    ),
-  ).toContain("Commit");
+  const form = page.locator(".sidebar-changes > .commit-form");
+  await expect(form).toBeVisible();
+  const formBox = (await form.boundingBox())!;
+  const stagedBox = (await staged.boundingBox())!;
+  expect(formBox.y + formBox.height).toBeLessThanOrEqual(stagedBox.y);
   await staged.locator(".file-row").click({ button: "right" });
   await page
     .getByRole("menuitem", { name: "View changes in external tool" })
@@ -950,7 +954,7 @@ test("ref capsules use Ocean colors and emphasize Git's current branch", async (
   });
   await page.getByRole("button", { name: "Refresh", exact: true }).click();
   const current = page.locator(".ref-label.current");
-  await expect(current).toHaveText("main");
+  await expect(current).toHaveText("main · ☁ origin");
   await expect(current).toHaveCSS("font-weight", "600");
   await expect(current).toHaveCSS("border-radius", "4px");
   await expect(current).toHaveCSS("border-top-width", "1px");
@@ -959,23 +963,23 @@ test("ref capsules use Ocean colors and emphasize Git's current branch", async (
   ).toHaveCSS("font-weight", "400");
   const colors = async () =>
     Promise.all(
-      ["local", "remote", "tag"].map((kind) =>
+      ["local", "tag"].map((kind) =>
         page
           .locator(".ref-label." + kind)
           .first()
           .evaluate((el) => getComputedStyle(el).color),
       ),
     );
-  expect(new Set(await colors()).size).toBe(3);
+  expect(new Set(await colors()).size).toBe(2);
   await page
     .getByRole("button", { name: "Older commit", exact: false })
     .click();
-  await expect(current).toHaveText("main");
+  await expect(current).toHaveText("main · ☁ origin");
   await expect(page.locator(".commit-row.selected")).toContainText(
     "Older commit",
   );
   await darkTheme(page);
-  expect(new Set(await colors()).size).toBe(3);
+  expect(new Set(await colors()).size).toBe(2);
   await expect(current).toHaveCSS("font-weight", "600");
 });
 
@@ -2946,7 +2950,14 @@ async function seedRecentRepositories(
         "gitextensions.recentRepos",
         JSON.stringify(entries),
       );
-      if (welcome) localStorage.setItem("test.welcome", "true");
+      if (welcome) {
+        localStorage.setItem("test.welcome", "true");
+        // A missing last repository leaves the welcome list available at startup.
+        localStorage.setItem(
+          "gitextensions.lastRepository",
+          "/tmp/missing-last",
+        );
+      }
     },
     { count, favorite, welcome },
   );
@@ -3093,6 +3104,7 @@ test("welcome list supports favorites, filtering and removable missing repositor
       lastOpened: new Date().toISOString(),
     });
     localStorage.setItem("gitextensions.recentRepos", JSON.stringify(entries));
+    localStorage.setItem("gitextensions.lastRepository", "/tmp/missing-repo");
   });
   await page.reload();
   const missing = page.locator('.welcome [data-path="/tmp/missing-repo"]');

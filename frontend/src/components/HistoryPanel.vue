@@ -66,11 +66,13 @@
       </form>
     </div>
     <div
+      ref="header"
       class="history-header"
       :style="{ ...columns, paddingRight: gutter + 'px' }"
     >
       <span>{{ $t("graph") }}</span
-      ><span>SHA</span><span>{{ $t("history") }}</span
+      ><span>{{ $t("history") }}</span
+      ><span>SHA</span
       ><span
         v-if="preferencesStore.showAuthorAvatarColumn"
         :title="$t('avatar')"
@@ -112,9 +114,6 @@
               @keydown.shift.f10="menu($event, row.commit)"
             >
               <span aria-hidden="true"></span>
-              <button class="hash" @click="store.selectCommit(row.commit)">
-                {{ row.commit.hash.slice(0, 8) }}
-              </button>
               <button
                 class="subject"
                 :aria-pressed="store.selectedCommit?.hash === row.commit.hash"
@@ -122,7 +121,15 @@
                 :aria-label="`${row.commit.refs} ${row.commit.subject}`.trim()"
                 @click="store.selectCommit(row.commit)"
               >
-                <span v-if="labelMap.get(row.commit.hash)?.length" class="refs">
+                <span
+                  v-if="labelMap.get(row.commit.hash)?.length"
+                  class="refs"
+                  :class="{
+                    'has-current':
+                      row.commit.hash === pointers.branch &&
+                      !store.snapshot?.detached,
+                  }"
+                >
                   <span
                     v-for="label in labelMap.get(row.commit.hash)"
                     :key="label.kind + ':' + label.name"
@@ -138,9 +145,32 @@
                         : label.kind === "remote"
                           ? "☁ "
                           : ""
-                    }}{{ label.name }}</span
+                    }}{{ label.name
+                    }}<span
+                      v-for="remote in label.remotes"
+                      :key="remote"
+                      class="combined-remote"
+                      :title="remote"
+                      @contextmenu.stop="
+                        refMenu($event, row.commit, {
+                          name: remote,
+                          kind: 'remote',
+                          current: false,
+                        })
+                      "
+                    >
+                      · ☁
+                      {{
+                        remote.slice(remote.indexOf("/") + 1) === label.name
+                          ? remote.slice(0, remote.indexOf("/"))
+                          : remote
+                      }}</span
+                    ></span
                   > </span
                 ><span class="subject-text">{{ row.commit.subject }}</span>
+              </button>
+              <button class="hash" @click="store.selectCommit(row.commit)">
+                {{ row.commit.hash.slice(0, 8) }}
               </button>
               <span
                 v-if="preferencesStore.showAuthorAvatarColumn"
@@ -314,9 +344,33 @@ class HistoryPanel extends Vue {
       commit.authorEmail === this.store.identity.email
     );
   }
+  get currentRefWidth() {
+    const branch = this.store.snapshot?.branches.find(
+      (branch) => branch.current && !branch.remote,
+    );
+    const label =
+      branch && this.labelMap.get(branch.hash)?.find((label) => label.current);
+    if (!label) return 150;
+    const context = document.createElement("canvas").getContext("2d");
+    if (!context) return 150;
+    const font = `${(this.fontSize * 11) / 13}px ${this.preferencesStore.uiFont || getComputedStyle(document.documentElement).getPropertyValue("--font-sans")}`;
+    context.font = `600 ${font}`;
+    let width = context.measureText(label.name).width;
+    context.font = `400 ${font}`;
+    for (const remote of label.remotes ?? []) {
+      const slash = remote.indexOf("/");
+      const name =
+        remote.slice(slash + 1) === label.name
+          ? remote.slice(0, slash)
+          : remote;
+      width += context.measureText(` · ☁ ${name}`).width;
+    }
+    // Include badge borders/padding, subject padding and the gap after the badge.
+    return Math.max(150, Math.ceil(width) + 30);
+  }
   get columns() {
     return {
-      gridTemplateColumns: `${Math.min(MAX_LANES, this.layout.lanes) * graphLaneWidth(this.fontSize) + (GRAPH_EXTRA_WIDTH * this.fontSize) / 13}px 92px minmax(150px,1fr) ${this.preferencesStore.showAuthorAvatarColumn ? Math.round((36 * this.fontSize) / 13) + "px " : ""}140px ${Math.round((122 * this.fontSize) / 13)}px`,
+      gridTemplateColumns: `${Math.min(MAX_LANES, this.layout.lanes) * graphLaneWidth(this.fontSize) + (GRAPH_EXTRA_WIDTH * this.fontSize) / 13}px minmax(${this.currentRefWidth}px,1fr) 92px ${this.preferencesStore.showAuthorAvatarColumn ? Math.round((36 * this.fontSize) / 13) + "px " : ""}140px ${Math.round((122 * this.fontSize) / 13)}px`,
     };
   }
   @Watch("fontSize")
@@ -506,7 +560,11 @@ class HistoryPanel extends Vue {
     return `${container.preferences.themeRevision}-${container.preferences.locale}`;
   }
   scroll(event: Event) {
-    this.offset = (event.target as HTMLElement).scrollTop;
+    const scroller = event.target as HTMLElement;
+    this.offset = scroller.scrollTop;
+    const transform = `translateX(${-scroller.scrollLeft}px)`;
+    (this.$refs.canvas as HTMLCanvasElement).style.transform = transform;
+    (this.$refs.header as HTMLElement).style.transform = transform;
     this.schedule();
     this.loadMoreIfNeeded();
   }
@@ -679,6 +737,7 @@ export default toNative(HistoryPanel);
   }
 }
 .history-viewport {
+  overflow: hidden;
   flex: 1;
   min-height: 0;
   position: relative;
@@ -758,6 +817,10 @@ export default toNative(HistoryPanel);
   overflow: hidden;
   gap: 4px;
 }
+.refs.has-current {
+  flex-shrink: 0;
+  max-width: none;
+}
 .ref-label {
   display: inline-block;
   flex: 0 1 auto;
@@ -788,10 +851,12 @@ export default toNative(HistoryPanel);
   }
   /* The checked-out branch is a filled pill so it stays visible on selected rows. */
   &.current {
+    flex-shrink: 0;
+    max-width: none;
     font-weight: 600;
     color: var(--color-level-200);
     background: var(--ref-local);
-    дborder-color: var(--ref-local);
+    border-color: var(--ref-local);
   }
 }
 .commit-canvas {
@@ -842,7 +907,7 @@ export default toNative(HistoryPanel);
     height: calc(var(--font-size-base) * 10 / 13);
   }
   .head-marker {
-    border: 2px solid var(--graph-head);
+    border: 1px solid var(--graph-head);
     border-radius: 50%;
   }
   .branch-marker {
@@ -852,5 +917,11 @@ export default toNative(HistoryPanel);
     border-right: 5px solid transparent;
     border-top: 8px solid var(--ref-local);
   }
+}
+</style>
+
+<style lang="scss" scoped>
+.combined-remote {
+  font-weight: 400;
 }
 </style>

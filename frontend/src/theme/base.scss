@@ -127,7 +127,6 @@ label.check {
   font: var(--font-size-code) var(--font-code);
   color: var(--color-positive);
 }
-.sidebar-files .file-status,
 .file-type-icon {
   flex: 0 0 16px;
   text-align: center;
@@ -136,7 +135,10 @@ label.check {
 .file-type-icon {
   color: var(--color-text-secondary);
 }
-.sidebar-files .file-status {
+.sidebar-files .file-type-icon {
+  &.status-added {
+    color: var(--color-positive);
+  }
   &.status-modified,
   &.status-renamed,
   &.status-copied {
@@ -289,4 +291,21 @@ html {
 .theme-switching *::before,
 .theme-switching *::after {
   transition: none !important;
+}
+
+.section-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  text-transform: inherit;
+  letter-spacing: inherit;
+  cursor: pointer;
+  .pi {
+    font-size: 0.75em;
+  }
 }
